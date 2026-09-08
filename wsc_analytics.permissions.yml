@@ -1,0 +1,8 @@
+administer wsc analytics:
+  title: 'Administer WSC Analytics & Bot Shield'
+  description: 'Manage tracking settings, gateway connection, and privacy modes.'
+  restrict access: true
+
+access wsc analytics reports:
+  title: 'View WSC Analytics Reports & Dashboard'
+  description: 'View the 3-Card Analytics Dashboard and insights.'

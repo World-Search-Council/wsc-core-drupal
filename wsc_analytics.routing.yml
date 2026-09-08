@@ -1,0 +1,64 @@
+wsc_analytics.dashboard:
+  path: '/admin/reports/wsc-analytics'
+  defaults:
+    _controller: '\Drupal\wsc_analytics\Controller\WscDashboardController::renderDashboard'
+    _title: 'WSC Analytics & Bot Shield'
+  requirements:
+    _permission: 'access wsc analytics reports'
+
+wsc_analytics.settings:
+  path: '/admin/config/services/wsc-analytics'
+  defaults:
+    _form: '\Drupal\wsc_analytics\Form\WscSettingsForm'
+    _title: 'WSC Analytics Settings'
+  requirements:
+    _permission: 'administer wsc analytics'
+
+wsc_analytics.api_track:
+  path: '/wsc/v1/track'
+  defaults:
+    _controller: '\Drupal\wsc_analytics\Controller\WscApiController::track'
+  requirements:
+    _access: 'TRUE'
+  methods: [POST]
+
+wsc_analytics.api_webhook:
+  path: '/wsc/v1/webhook'
+  defaults:
+    _controller: '\Drupal\wsc_analytics\Controller\WscApiController::handleWebhook'
+  requirements:
+    _access: 'TRUE'
+  methods: [POST]
+
+wsc_analytics.ajax_refresh:
+  path: '/wsc/v1/refresh'
+  defaults:
+    _controller: '\Drupal\wsc_analytics\Controller\WscDashboardController::ajaxRefresh'
+  requirements:
+    _permission: 'access wsc analytics reports'
+  methods: [POST]
+
+wsc_analytics.api_cards:
+  path: '/wsc/v1/cards'
+  defaults:
+    _controller: '\Drupal\wsc_analytics\Controller\WscApiController::getCards'
+  requirements:
+    _permission: 'access wsc analytics reports'
+  methods: [GET]
+
+wsc_analytics.pagespeed_audit:
+  path: '/wsc/v1/pagespeed/audit'
+  defaults:
+    _controller: '\Drupal\wsc_analytics\Controller\WscApiController::triggerPagespeedAudit'
+  requirements:
+    _permission: 'access wsc analytics reports'
+  methods: [POST]
+
+wsc_analytics.sentinel_scan:
+  path: '/wsc/v1/sentinel/scan'
+  defaults:
+    _controller: '\Drupal\wsc_analytics\Controller\WscApiController::triggerSentinelScan'
+  requirements:
+    _permission: 'access wsc analytics reports'
+  methods: [POST]
+

@@ -1,0 +1,18 @@
+services:
+  wsc_analytics.db_manager:
+    class: Drupal\wsc_analytics\Service\WscDatabaseManager
+    arguments: ['@file_system', '@config.factory', '@logger.factory']
+
+  wsc_analytics.bot_tracker:
+    class: Drupal\wsc_analytics\Service\WscBotTracker
+    arguments: ['@config.factory', '@logger.factory']
+
+  wsc_analytics.core:
+    class: Drupal\wsc_analytics\Service\WscCoreService
+    arguments: ['@wsc_analytics.db_manager', '@wsc_analytics.bot_tracker', '@config.factory', '@http_client', '@logger.factory', '@state']
+
+  wsc_analytics.request_subscriber:
+    class: Drupal\wsc_analytics\EventSubscriber\WscRequestSubscriber
+    arguments: ['@wsc_analytics.core', '@wsc_analytics.bot_tracker', '@config.factory']
+    tags:
+      - { name: event_subscriber }

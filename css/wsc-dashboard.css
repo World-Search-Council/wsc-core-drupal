@@ -1,0 +1,396 @@
+/* WSC 7-Card Bento Dashboard CSS for Drupal Admin (Claro / Gin compatible) */
+
+.wsc-dashboard-wrapper {
+  margin: 1.5rem 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+}
+
+.wsc-dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #ffffff;
+  padding: 1.25rem 1.5rem;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  border-left: 5px solid #0284c7;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.wsc-header-titles h2 {
+  margin: 0 0 0.25rem 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #0f172a;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.wsc-version-tag {
+  font-size: 0.75rem;
+  background: #e0f2fe;
+  color: #0369a1;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.wsc-header-meta {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+.wsc-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.wsc-period-toggle {
+  display: flex;
+  background: #f1f5f9;
+  border-radius: 6px;
+  padding: 2px;
+}
+
+.wsc-toggle-btn {
+  border: none;
+  background: transparent;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #475569;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.wsc-toggle-btn.active {
+  background: #ffffff;
+  color: #0284c7;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.wsc-btn-diagnostic {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  cursor: pointer;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.85rem;
+}
+
+.wsc-btn-refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+}
+
+/* 7-Card Bento Grid */
+.wsc-bento-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+@media (max-width: 1024px) {
+  .wsc-bento-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .wsc-bento-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.wsc-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 1.25rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+}
+
+.wsc-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border-color: #0284c7;
+}
+
+.wsc-card.active {
+  border-color: #0284c7;
+  box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.2);
+}
+
+.wsc-card-full-width {
+  grid-column: 1 / -1;
+}
+
+.wsc-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.wsc-card-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.wsc-header-status {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.wsc-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.2rem 0.5rem;
+  border-radius: 12px;
+  text-transform: uppercase;
+}
+
+.wsc-badge-human { background: #dcfce7; color: #15803d; }
+.wsc-badge-ai { background: #e0f2fe; color: #0369a1; }
+.wsc-badge-shield { background: #fee2e2; color: #b91c1c; }
+.wsc-badge-ux { background: #fef3c7; color: #b45309; }
+.wsc-badge-outbound { background: #f3e8ff; color: #7e22ce; }
+.wsc-badge-funnel { background: #ecfdf5; color: #047857; }
+.wsc-badge-score { background: #f1f5f9; color: #0f172a; font-weight: 800; }
+.wsc-badge-healthy { background: #dcfce7; color: #15803d; font-weight: 800; }
+
+/* Metrics Row */
+.wsc-metrics-row {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.wsc-metric-box {
+  flex: 1;
+  background: #f8fafc;
+  padding: 0.75rem;
+  border-radius: 6px;
+  border: 1px solid #f1f5f9;
+}
+
+.wsc-metric-label {
+  display: block;
+  font-size: 0.75rem;
+  color: #64748b;
+  margin-bottom: 0.25rem;
+}
+
+.wsc-metric-value {
+  display: block;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+/* Channel Breakdown */
+.wsc-channel-breakdown h4 {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.85rem;
+  color: #475569;
+}
+
+.wsc-channel-bar {
+  display: flex;
+  height: 10px;
+  border-radius: 5px;
+  overflow: hidden;
+  background: #f1f5f9;
+  margin-bottom: 0.5rem;
+}
+
+.seg-ai { background: #8b5cf6; }
+.seg-search { background: #3b82f6; }
+.seg-social { background: #ec4899; }
+.seg-direct { background: #10b981; }
+
+.wsc-channel-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.dot-ai { background: #8b5cf6; }
+.dot-search { background: #3b82f6; }
+.dot-social { background: #ec4899; }
+.dot-direct { background: #10b981; }
+
+/* Bot Shield Card */
+.wsc-bot-ratio {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  background: #f8fafc;
+  padding: 1rem;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+}
+
+.wsc-ratio-box { text-align: center; }
+.wsc-ratio-num { display: block; font-size: 1.5rem; font-weight: 800; color: #0f172a; }
+.wsc-ratio-lbl { font-size: 0.75rem; color: #64748b; }
+.wsc-ratio-divider { font-weight: 700; color: #94a3b8; font-size: 0.85rem; }
+
+.wsc-bot-stat-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 0.85rem;
+  color: #475569;
+}
+
+.wsc-bot-stat-row:last-child { border-bottom: none; }
+
+/* Milestones List */
+.wsc-milestones-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.wsc-milestone-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.8rem;
+  color: #475569;
+}
+
+/* Funnel Stages */
+.wsc-funnel-stages {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.4rem;
+  background: #f8fafc;
+  padding: 0.6rem;
+  border-radius: 6px;
+}
+
+.wsc-funnel-step {
+  text-align: center;
+}
+
+.wsc-funnel-step .step-num {
+  display: block;
+  font-size: 0.7rem;
+  color: #94a3b8;
+}
+
+.wsc-funnel-step .step-label {
+  display: block;
+  font-size: 0.75rem;
+  color: #475569;
+}
+
+.wsc-funnel-step .step-val {
+  display: block;
+  font-size: 1rem;
+  color: #0f172a;
+}
+
+/* Sentinel Domain Health */
+.wsc-sentinel-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  background: #f8fafc;
+  padding: 1rem;
+  border-radius: 6px;
+}
+
+@media (max-width: 768px) {
+  .wsc-sentinel-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.wsc-sentinel-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.sentinel-col-title {
+  font-size: 0.75rem;
+  color: #64748b;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.wsc-card-footer {
+  margin-top: auto;
+  padding-top: 0.75rem;
+  border-top: 1px solid #f1f5f9;
+  color: #94a3b8;
+  text-align: right;
+  font-size: 0.75rem;
+}
+
+/* Detail Panel */
+.wsc-detail-panel {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.wsc-detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #f1f5f9;
+  padding-bottom: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.wsc-detail-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.wsc-close-detail {
+  background: transparent;
+  border: none;
+  font-size: 1.5rem;
+  color: #94a3b8;
+  cursor: pointer;
+}

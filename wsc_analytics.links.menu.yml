@@ -1,0 +1,12 @@
+wsc_analytics.dashboard:
+  title: 'WSC Analytics & Bot Shield'
+  description: 'View privacy-first analytics, AI crawl stats, and human insights.'
+  parent: system.admin_reports
+  route_name: wsc_analytics.dashboard
+  weight: -10
+
+wsc_analytics.settings:
+  title: 'WSC Analytics'
+  description: 'Configure WSC Tracking, gateway connections, and privacy modes.'
+  parent: system.admin_config_services
+  route_name: wsc_analytics.settings

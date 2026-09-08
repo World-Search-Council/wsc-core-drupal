@@ -1,0 +1,11 @@
+wsc_analytics.dashboard_tab:
+  title: 'Dashboard'
+  route_name: wsc_analytics.dashboard
+  base_route: wsc_analytics.dashboard
+  weight: 0
+
+wsc_analytics.settings_tab:
+  title: 'Settings'
+  route_name: wsc_analytics.settings
+  base_route: wsc_analytics.dashboard
+  weight: 10

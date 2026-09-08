@@ -1,0 +1,113 @@
+<?php
+
+/**
+ * @file
+ * Primary module hooks for WSC Analytics & Bot Shield.
+ */
+
+use Drupal\Core\Routing\RouteMatchInterface;
+use Drupal\Core\Url;
+
+/**
+ * Implements hook_page_attachments().
+ */
+function wsc_analytics_page_attachments(array &$page) {
+  $config = \Drupal::config('wsc_analytics.settings');
+
+  // Check if tracking is globally enabled
+  if (!$config->get('tracking_active')) {
+    return;
+  }
+
+  // Check if current user is admin and admin exclusion is enabled
+  $current_user = \Drupal::currentUser();
+  if ($config->get('exclude_admins') && $current_user->hasPermission('administer wsc analytics')) {
+    return;
+  }
+
+  // Attach canonical tracking runtime
+  $page['#attached']['library'][] = 'wsc_analytics/tracker';
+
+  // Pass localized configuration to window.WSC_CONFIG
+  $page['#attached']['drupalSettings']['wscConfig'] = [
+    'endpoint' => Url::fromRoute('wsc_analytics.api_track')->toString(),
+    'mode' => $config->get('tracking_mode') ?: 'cookieless',
+    'consentKey' => 'wsc_consent',
+    'auto' => [
+      'downloads' => (bool) $config->get('auto_downloads'),
+      'media' => (bool) $config->get('auto_media'),
+      'outbound' => (bool) $config->get('auto_outbound'),
+      'forms' => (bool) $config->get('auto_forms'),
+      'scroll' => (bool) $config->get('auto_scroll'),
+      'timeOnPage' => (bool) $config->get('auto_time_on_page'),
+      'timeToInteraction' => (bool) $config->get('auto_time_to_interaction'),
+      'videoProgress' => (bool) $config->get('auto_video_progress'),
+      'formFieldTiming' => (bool) $config->get('auto_form_field_timing'),
+    ],
+  ];
+}
+
+/**
+ * Implements hook_cron().
+ */
+function wsc_analytics_cron() {
+  /** @var \Drupal\wsc_analytics\Service\WscCoreService $core */
+  $core = \Drupal::service('wsc_analytics.core');
+
+  // Process batch export to WSC Gateway
+  $core->processBatchExport();
+
+  // Run daily cleanup / pruning & SQLite optimization
+  $last_cleanup = \Drupal::state()->get('wsc_analytics.last_cleanup', 0);
+  if ((time() - $last_cleanup) > 86400) {
+    $core->cleanupOldData();
+    \Drupal::state()->set('wsc_analytics.last_cleanup', time());
+  }
+}
+
+/**
+ * Implements hook_theme().
+ */
+function wsc_analytics_theme() {
+  return [
+    'wsc_dashboard' => [
+      'variables' => [
+        'card1' => [],
+        'card2' => [],
+        'card3' => [],
+        'card_engagement' => [],
+        'card_outbound' => [],
+        'card_ecommerce' => [],
+        'domain_health' => [],
+        'pagespeed' => [],
+        'project_id' => '',
+        'last_sync' => '',
+        'has_data' => false,
+        'site_host' => '',
+        'site_url' => '',
+      ],
+      'template' => 'wsc-dashboard',
+    ],
+    'wsc_card_traffic' => [
+      'variables' => [
+        'data_7d' => [],
+        'data_30d' => [],
+      ],
+      'template' => 'wsc-card-traffic',
+    ],
+    'wsc_card_insights' => [
+      'variables' => [
+        'data_7d' => [],
+        'data_30d' => [],
+      ],
+      'template' => 'wsc-card-insights',
+    ],
+    'wsc_card_bots' => [
+      'variables' => [
+        'data_7d' => [],
+        'data_30d' => [],
+      ],
+      'template' => 'wsc-card-bots',
+    ],
+  ];
+}
