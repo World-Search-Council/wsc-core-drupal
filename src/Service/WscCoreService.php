@@ -14,7 +14,7 @@ use Exception;
  */
 class WscCoreService {
 
-  public const GATEWAY_API_DEFAULT = 'https://api.worldseocouncil.com';
+  public const GATEWAY_API_DEFAULT = 'https://api.worldsearchcouncil.org';
 
   /** @var \Drupal\wsc_analytics\Service\WscDatabaseManager */
   protected $dbManager;

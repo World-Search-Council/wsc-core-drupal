@@ -129,7 +129,7 @@ class WscApiController extends ControllerBase {
 
     try {
       $client = \Drupal::httpClient();
-      $response = $client->post('https://gateway.worldseocouncil.com/v1/ai-coverage/query', [
+      $response = $client->post('https://api.worldsearchcouncil.org/v1/ai-coverage/query', [
         'headers' => [
           'Content-Type' => 'application/json',
           'X-WSC-Sig'    => $signature,
