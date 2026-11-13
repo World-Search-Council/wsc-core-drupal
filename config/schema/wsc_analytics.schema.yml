@@ -1,0 +1,64 @@
+wsc_analytics.settings:
+  type: config_object
+  label: 'WSC Analytics & Bot Shield settings'
+  mapping:
+    tracking_active:
+      type: boolean
+      label: 'Enable WSC Analytics Tracking'
+    tracking_mode:
+      type: string
+      label: 'Tracking Mode'
+    exclude_admins:
+      type: boolean
+      label: 'Exclude Administrators from Tracking'
+    hybrid_enabled:
+      type: boolean
+      label: 'Enable Opt-In Hybrid Sync with WSC Gateway'
+    gateway_url:
+      type: string
+      label: 'Gateway API URL'
+    bot_tracking_level:
+      type: string
+      label: 'Bot Tracking Scope'
+    auto_downloads:
+      type: boolean
+      label: 'Auto-track file downloads'
+    auto_media:
+      type: boolean
+      label: 'Auto-track HTML5 media'
+    auto_outbound:
+      type: boolean
+      label: 'Auto-track outbound links'
+    auto_forms:
+      type: boolean
+      label: 'Auto-track form submissions'
+    auto_scroll:
+      type: boolean
+      label: 'Auto-track scroll depth'
+    auto_time_on_page:
+      type: boolean
+      label: 'Auto-track engaged time on page'
+    auto_time_to_interaction:
+      type: boolean
+      label: 'Auto-track time to first interaction'
+    auto_video_progress:
+      type: boolean
+      label: 'Auto-track video progress'
+    auto_form_field_timing:
+      type: boolean
+      label: 'Auto-track form field timing'
+    retention_days:
+      type: integer
+      label: 'Local Queue Retention (Days)'
+    llms_txt_enabled:
+      type: boolean
+      label: 'Enable public /llms.txt AI Manifest'
+    llms_txt_summary:
+      type: string
+      label: 'Custom /llms.txt Site Summary'
+    indexnow_enabled:
+      type: boolean
+      label: 'Enable Opt-In IndexNow Instant Push'
+    industry_vertical:
+      type: string
+      label: 'Industry Benchmark Vertical'

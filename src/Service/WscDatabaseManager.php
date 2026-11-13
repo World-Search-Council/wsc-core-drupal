@@ -10,7 +10,7 @@ use PDO;
 use Exception;
 
 /**
- * Manages WSC dual SQLite databases (Queue & Reports) and Drupal Database connections.
+ * Manages WSC dual SQLite databases (Queue & Reports) in WAL mode and Drupal Views connections.
  */
 class WscDatabaseManager {
 
@@ -65,7 +65,7 @@ class WscDatabaseManager {
     // Security Hardening: write .htaccess, web.config, index.php
     $htaccess = $real_dir . '/.htaccess';
     if (!file_exists($htaccess)) {
-      @file_put_contents($htaccess, "Require all denied\nDeny from all\n");
+      @file_put_contents($htaccess, "Require all denied\nDeny from all\nOptions -Indexes\n");
     }
     $webconfig = $real_dir . '/web.config';
     if (!file_exists($webconfig)) {
@@ -163,7 +163,7 @@ class WscDatabaseManager {
   }
 
   /**
-   * Initialize Reports table schema.
+   * Initialize Reports table schema (Zero-PII: stores rotating daily SHA-256 session hashes only).
    */
   public function initReportsSchema(): void {
     try {
@@ -205,6 +205,37 @@ class WscDatabaseManager {
           unique_visitors INTEGER DEFAULT 1,
           PRIMARY KEY (date, url_path)
         );
+
+        CREATE TABLE IF NOT EXISTS wsc_bot_hits (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          hit_at INTEGER NOT NULL,
+          bot_name TEXT NOT NULL,
+          bot_category TEXT DEFAULT 'ai',
+          bot_type TEXT DEFAULT 'rag',
+          url_path TEXT NOT NULL,
+          ip_hash TEXT DEFAULT '',
+          status_code INTEGER DEFAULT 200
+        );
+        CREATE INDEX IF NOT EXISTS idx_wsc_bot_hits_time ON wsc_bot_hits (hit_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_wsc_bot_hits_path ON wsc_bot_hits (url_path, hit_at DESC);
+
+        CREATE TABLE IF NOT EXISTS wsc_user_hits (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          hit_at INTEGER NOT NULL,
+          url_path TEXT NOT NULL,
+          ip_hash TEXT DEFAULT ''
+        );
+        CREATE INDEX IF NOT EXISTS idx_wsc_user_hits_time ON wsc_user_hits (hit_at DESC);
+
+        CREATE TABLE IF NOT EXISTS wsc_interaction_events (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          hit_at INTEGER NOT NULL,
+          event_type TEXT NOT NULL,
+          url_path TEXT NOT NULL,
+          duration_sec REAL DEFAULT 0.0,
+          meta_json TEXT DEFAULT '{}'
+        );
+        CREATE INDEX IF NOT EXISTS idx_wsc_interactions_time ON wsc_interaction_events (hit_at DESC);
       ");
     }
     catch (Exception $e) {

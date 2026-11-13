@@ -14,6 +14,14 @@ wsc_analytics.settings:
   requirements:
     _permission: 'administer wsc analytics'
 
+wsc_analytics.llms_txt:
+  path: '/llms.txt'
+  defaults:
+    _controller: '\Drupal\wsc_analytics\Controller\WscApiController::serveLlmsTxt'
+  requirements:
+    _access: 'TRUE'
+  methods: [GET, HEAD]
+
 wsc_analytics.api_track:
   path: '/wsc/v1/track'
   defaults:
@@ -62,3 +70,58 @@ wsc_analytics.sentinel_scan:
     _permission: 'access wsc analytics reports'
   methods: [POST]
 
+wsc_analytics.ai_coverage_query:
+  path: '/wsc/v1/ai-coverage/query'
+  defaults:
+    _controller: '\Drupal\wsc_analytics\Controller\WscApiController::aiCoverage'
+  requirements:
+    _permission: 'access wsc analytics reports'
+  methods: [POST]
+
+wsc_analytics.benchmarks_query:
+  path: '/wsc/v1/benchmarks/query'
+  defaults:
+    _controller: '\Drupal\wsc_analytics\Controller\WscApiController::getBenchmarks'
+  requirements:
+    _permission: 'access wsc analytics reports'
+  methods: [GET, POST]
+
+wsc_analytics.benchmarks_classify:
+  path: '/wsc/v1/benchmarks/classify'
+  defaults:
+    _controller: '\Drupal\wsc_analytics\Controller\WscApiController::classifyBenchmark'
+  requirements:
+    _permission: 'access wsc analytics reports'
+  methods: [POST]
+
+wsc_analytics.license_verify:
+  path: '/wsc/v1/license/verify'
+  defaults:
+    _controller: '\Drupal\wsc_analytics\Controller\WscApiController::verifyLicense'
+  requirements:
+    _permission: 'administer wsc analytics'
+  methods: [POST]
+
+wsc_analytics.license_disconnect:
+  path: '/wsc/v1/license/disconnect'
+  defaults:
+    _controller: '\Drupal\wsc_analytics\Controller\WscApiController::disconnectLicense'
+  requirements:
+    _permission: 'administer wsc analytics'
+  methods: [POST]
+
+wsc_analytics.cobranding_save:
+  path: '/wsc/v1/cobranding/save'
+  defaults:
+    _controller: '\Drupal\wsc_analytics\Controller\WscApiController::saveCoBranding'
+  requirements:
+    _permission: 'administer wsc analytics'
+  methods: [POST]
+
+wsc_analytics.indexnow_submit:
+  path: '/wsc/v1/indexnow/submit'
+  defaults:
+    _controller: '\Drupal\wsc_analytics\Controller\WscApiController::submitIndexNow'
+  requirements:
+    _permission: 'administer wsc analytics'
+  methods: [POST]

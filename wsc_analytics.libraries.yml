@@ -1,12 +1,12 @@
 tracker:
-  version: 1.5.0
+  version: 2.2.3
   js:
     js/wsc-tracker.js: { attributes: { defer: true, async: true } }
   dependencies:
     - core/drupalSettings
 
 dashboard:
-  version: 1.5.0
+  version: 2.2.3
   css:
     theme:
       css/wsc-dashboard.css: {}

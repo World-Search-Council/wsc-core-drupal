@@ -1,0 +1,20 @@
+tracking_active: true
+tracking_mode: 'cookieless'
+exclude_admins: true
+hybrid_enabled: false
+gateway_url: 'https://api.worldsearchcouncil.org'
+bot_tracking_level: 'search_ai'
+auto_downloads: false
+auto_media: false
+auto_outbound: false
+auto_forms: false
+auto_scroll: false
+auto_time_on_page: false
+auto_time_to_interaction: false
+auto_video_progress: false
+auto_form_field_timing: false
+retention_days: 30
+llms_txt_enabled: true
+llms_txt_summary: ''
+indexnow_enabled: false
+industry_vertical: '/Business & Industrial/Services'

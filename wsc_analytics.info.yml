@@ -1,7 +1,7 @@
 name: 'WSC Analytics & Bot Shield'
 type: module
-description: 'Privacy-first, cookieless hybrid analytics, AI bot shield, and Drupal Views / Charts integration for the World Search Council standard.'
+description: 'Privacy-first, 100% cookieless hybrid analytics, AI bot shield, AI Coverage URL Inspector, Industry Benchmarks, /llms.txt, Opt-In IndexNow, and WSC Member Bridge for Drupal.'
 package: 'SEO & Analytics'
 core_version_requirement: '^8.8 || ^9 || ^10 || ^11'
-version: '2.2.0'
+version: '2.2.3'
 configure: wsc_analytics.settings

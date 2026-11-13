@@ -1,36 +1,42 @@
 /**
  * @file
- * WSC 7-Card Bento Analytics Dashboard behavior for Drupal (v2.2.0).
+ * WSC 7-Card Bento Analytics, AI Coverage, Benchmarks, Membership & IndexNow behavior for Drupal 8–11 (v2.2.3).
  */
 
 (function(Drupal, drupalSettings, once) {
   'use strict';
 
   Drupal.behaviors.wscDashboard = {
-    attach: function(context, settings) {
+    attach: function(context) {
       once('wsc-dashboard-init', '.wsc-dashboard-wrapper', context).forEach(function(wrapper) {
         const dashboardData = (drupalSettings && drupalSettings.wscDashboard) ? drupalSettings.wscDashboard : {};
         const cardsData = dashboardData.cards || {};
         let currentPeriod = '7d';
 
-        // Banner Elements
         const banner = document.getElementById('wsc-diagnostic-banner');
         const bannerTitle = document.getElementById('wsc-banner-title');
         const bannerMsg = document.getElementById('wsc-banner-msg');
 
         function showBanner(title, msg) {
           if (!banner) return;
-          bannerTitle.textContent = title;
-          bannerMsg.textContent = msg;
+          if (bannerTitle) bannerTitle.textContent = title;
+          if (bannerMsg) bannerMsg.textContent = msg;
           banner.style.display = 'block';
         }
 
         function hideBanner() {
-          if (!banner) return;
-          banner.style.display = 'none';
+          if (banner) banner.style.display = 'none';
         }
 
-        // 1. Multi-Period Selector (1d, 7d, 30d, 90d, 365d)
+        function esc(s) {
+          return String(s == null ? '' : s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+        }
+
+        // 1. Multi-Period Selector
         const toggleBtns = wrapper.querySelectorAll('.wsc-toggle-btn');
         toggleBtns.forEach(btn => {
           btn.addEventListener('click', function() {
@@ -50,7 +56,6 @@
             const vVis = document.getElementById('val-visitors');
             const vPv = document.getElementById('val-pageviews');
             const vEng = document.getElementById('val-engaged');
-
             if (vVis && c1.visitors !== undefined) vVis.textContent = Number(c1.visitors).toLocaleString();
             if (vPv && c1.pageviews !== undefined) vPv.textContent = Number(c1.pageviews).toLocaleString();
             if (vEng && c1.avg_engaged_time !== undefined) vEng.textContent = c1.avg_engaged_time;
@@ -62,7 +67,6 @@
             const vRag = document.getElementById('val-ai-rag');
             const vTrain = document.getElementById('val-ai-training');
             const vSearch = document.getElementById('val-search-bots');
-
             if (vHum && c3.human_pct !== undefined) vHum.textContent = c3.human_pct + '%';
             if (vBot && c3.bot_pct !== undefined) vBot.textContent = c3.bot_pct + '%';
             if (vRag && c3.ai_rag_hits !== undefined) vRag.textContent = Number(c3.ai_rag_hits).toLocaleString();
@@ -71,7 +75,7 @@
           }
         }
 
-        // 2. Card Click -> Progressive Disclosure Detail Panel
+        // 2. Detail Drawer
         const cards = wrapper.querySelectorAll('.wsc-card-interactive');
         const detailPanel = document.getElementById('wsc-detail-panel');
         const detailTitle = document.getElementById('wsc-detail-title');
@@ -83,116 +87,10 @@
             const cardType = this.getAttribute('data-card');
             cards.forEach(c => c.classList.remove('active'));
             this.classList.add('active');
-
             if (detailPanel && detailTitle && detailContent) {
               detailPanel.style.display = 'block';
-
-              switch (cardType) {
-                case 'traffic':
-                  detailTitle.textContent = Drupal.t('1. Traffic Acquisition & Referral Attribution (@period)', {'@period': currentPeriod.toUpperCase()});
-                  detailContent.innerHTML = `
-                    <p class="text-muted">${Drupal.t('Real human visitor acquisition breakdown for Drupal site.')}</p>
-                    <table class="responsive-enabled">
-                      <thead><tr><th>${Drupal.t('Source')}</th><th>${Drupal.t('Channel Type')}</th><th>${Drupal.t('Conversion Readiness')}</th></tr></thead>
-                      <tbody>
-                        <tr><td><strong>AI Citations (ChatGPT / Perplexity)</strong></td><td>LLM Referral</td><td><span class="badge bg-success">${Drupal.t('High Intent')}</span></td></tr>
-                        <tr><td><strong>Organic Search (Google / Bing)</strong></td><td>Direct SERP</td><td><span class="badge bg-primary">${Drupal.t('Steady Inflow')}</span></td></tr>
-                        <tr><td><strong>Social Media Campaigns</strong></td><td>Campaign Inflow</td><td><span class="badge bg-info">${Drupal.t('Discovery')}</span></td></tr>
-                        <tr><td><strong>Direct Access</strong></td><td>Direct Bookmarks</td><td><span class="badge bg-secondary">${Drupal.t('Repeat Visitors')}</span></td></tr>
-                      </tbody>
-                    </table>
-                  `;
-                  break;
-
-                case 'insights':
-                  detailTitle.textContent = Drupal.t('2. Strategic Human Growth & Anomaly Insights');
-                  detailContent.innerHTML = `
-                    <div class="messages messages--status">
-                      <p><strong>${Drupal.t('Autonomous Growth Intelligence')}</strong>: ${Drupal.t('The WSC Gateway continuously compares your Drupal engagement velocity against industry benchmark clusters to surface actionable recommendations.')}</p>
-                    </div>
-                    <ul class="wsc-detail-list">
-                      <li><strong>${Drupal.t('Content Readability:')}</strong> ${Drupal.t('Long-form articles exceed benchmark reading time by +28%.')}</li>
-                      <li><strong>${Drupal.t('AI Citation Opportunities:')}</strong> ${Drupal.t('Ensure structured Schema.org metadata is enabled for Drupal nodes.')}</li>
-                    </ul>
-                  `;
-                  break;
-
-                case 'bots':
-                  detailTitle.textContent = Drupal.t('3. Pre-Cache Bot Shield & Scraper Network');
-                  detailContent.innerHTML = `
-                    <p class="text-muted">${Drupal.t('Logged at Drupal HTTP Kernel request level before Drupal Dynamic Page Cache execution.')}</p>
-                    <table class="responsive-enabled">
-                      <thead><tr><th>${Drupal.t('Bot Name')}</th><th>${Drupal.t('Category')}</th><th>${Drupal.t('Behavior')}</th><th>${Drupal.t('Status')}</th></tr></thead>
-                      <tbody>
-                        <tr><td><code>GPTBot</code></td><td>AI Training Scraper</td><td>Bulk Content Harvesting</td><td><span class="badge bg-warning text-dark">${Drupal.t('Monitored')}</span></td></tr>
-                        <tr><td><code>OAI-SearchBot</code></td><td>AI Live RAG Search</td><td>Real-Time Information Lookup</td><td><span class="badge bg-success">${Drupal.t('Allowed')}</span></td></tr>
-                        <tr><td><code>PerplexityBot</code></td><td>AI Live RAG Search</td><td>Citation Retrieval</td><td><span class="badge bg-success">${Drupal.t('Allowed')}</span></td></tr>
-                        <tr><td><code>Googlebot</code></td><td>Search Engine</td><td>SEO Storefront Crawl</td><td><span class="badge bg-primary">${Drupal.t('Allowed')}</span></td></tr>
-                      </tbody>
-                    </table>
-                  `;
-                  break;
-
-                case 'engagement':
-                  detailTitle.textContent = Drupal.t('4. Reading & UX Milestone Reality');
-                  detailContent.innerHTML = `
-                    <p class="text-muted">${Drupal.t('Engaged time measured via active DOM interaction, tab visibility, and scroll depth.')}</p>
-                    <div class="messages messages--status">
-                      <p><strong>${Drupal.t('UX Health Badges:')}</strong> <span class="badge bg-success">${Drupal.t('Deep Reader Favorite')}</span> &bull; <span class="badge bg-secondary">${Drupal.t('Low Bounce Cluster')}</span></p>
-                      <p class="small text-muted mb-0">${Drupal.t('Average Time to First Interaction (TTFI):')} <strong>1.2s</strong>.</p>
-                    </div>
-                  `;
-                  break;
-
-                case 'outbound':
-                  detailTitle.textContent = Drupal.t('5. Outbound Link Navigation Intelligence');
-                  detailContent.innerHTML = `
-                    <p class="text-muted">${Drupal.t('Tracks outgoing link clicks across social networks, recruiting portals, and partner platforms.')}</p>
-                    <table class="responsive-enabled">
-                      <thead><tr><th>${Drupal.t('Category')}</th><th>${Drupal.t('Share')}</th><th>${Drupal.t('Top Domains')}</th></tr></thead>
-                      <tbody>
-                        <tr><td>Social Networks</td><td>40%</td><td>instagram.com, linkedin.com</td></tr>
-                        <tr><td>Job Portals &amp; Recruiting</td><td>35%</td><td>stepstone.de, indeed.com</td></tr>
-                        <tr><td>References &amp; Affiliates</td><td>25%</td><td>github.com, drupal.org</td></tr>
-                      </tbody>
-                    </table>
-                  `;
-                  break;
-
-                case 'ecommerce':
-                  detailTitle.textContent = Drupal.t('6. Drupal Content Funnel & Form Conversions');
-                  detailContent.innerHTML = `
-                    <div class="messages messages--status">
-                      <p><strong>${Drupal.t('100% Ad-Blocker Immune:')}</strong> ${Drupal.t('Conversions and form submits are verified with zero client-side drop-off.')}</p>
-                    </div>
-                    <table class="responsive-enabled">
-                      <thead><tr><th>${Drupal.t('Stage 1: Views')}</th><th>${Drupal.t('Stage 2: Active Read')}</th><th>${Drupal.t('Stage 3: Form Open')}</th><th>${Drupal.t('Stage 4: Completed')}</th></tr></thead>
-                      <tbody>
-                        <tr>
-                          <td>2,410</td>
-                          <td>480 <span class="text-muted small">(19.9%)</span></td>
-                          <td>210 <span class="text-muted small">(43.7%)</span></td>
-                          <td><strong>115</strong> <span class="badge bg-success">(54.8%)</span></td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  `;
-                  break;
-
-                case 'sentinel':
-                  detailTitle.textContent = Drupal.t('7. Sentinel Domain Health & Infrastructure');
-                  detailContent.innerHTML = `
-                    <p class="text-muted">${Drupal.t('Authoritative DNS redundancy, DNSSEC, Port-25-free email security, and TLS certificate validation.')}</p>
-                    <ul class="wsc-detail-list">
-                      <li><strong>${Drupal.t('Nameserver Redundancy:')}</strong> <span class="badge bg-success">${Drupal.t('Configured (>= 2 NS)')}</span></li>
-                      <li><strong>${Drupal.t('DNSSEC Cryptographic Validation:')}</strong> <span class="badge bg-success">${Drupal.t('Active & Validated')}</span></li>
-                      <li><strong>${Drupal.t('Email Security (SPF & DMARC):')}</strong> <span class="badge bg-success">${Drupal.t('Authoritative DNS Protection (Zero Port 25 probing)')}</span></li>
-                      <li><strong>${Drupal.t('Security Headers:')}</strong> <span class="badge bg-success">${Drupal.t('Active')}</span></li>
-                    </ul>
-                  `;
-                  break;
-              }
-
+              detailTitle.textContent = Drupal.t('Detailed Telemetry: @type', {'@type': cardType.toUpperCase()});
+              detailContent.innerHTML = '<p>' + Drupal.t('Zero-PII SQLite WAL & ClickHouse telemetry synchronized under WSC v2.2.3 contract.') + '</p>';
               detailPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             }
           });
@@ -205,59 +103,161 @@
           });
         }
 
-        // 3. SpeedSentinel Trigger & Polling
+        // 3. SpeedSentinel & Sentinel Triggers
         const speedBtn = document.getElementById('wsc-trigger-pagespeed');
         if (speedBtn) {
           speedBtn.addEventListener('click', function() {
             speedBtn.disabled = true;
-            showBanner(Drupal.t('SpeedSentinel Lab Audit Started'), Drupal.t('Headless Playwright runner is testing mobile Core Web Vitals and RAG readiness...'));
-
+            showBanner(Drupal.t('SpeedSentinel Lab Audit Started'), Drupal.t('Validating same-host URL and enqueueing headless Playwright CWV + RAG audit...'));
             fetch(dashboardData.pagespeedUrl || '/wsc/v1/pagespeed/audit', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ url: dashboardData.siteUrl || window.location.origin, strategy: 'mobile' })
             })
-            .then(res => res.json())
-            .then(data => {
-              showBanner(Drupal.t('SpeedSentinel Audit Enqueued'), Drupal.t('Audit is processing asynchronously (HTTP 202). Polling for report update...'));
-              setTimeout(pollCardsUpdate, 6000);
+            .then(r => r.json())
+            .then(d => {
+              showBanner(d.ok === false ? Drupal.t('SpeedSentinel Notice') : Drupal.t('SpeedSentinel Enqueued'), d.error || Drupal.t('Polling for report update...'));
+              if (d.ok !== false) setTimeout(pollCardsUpdate, 6000);
             })
-            .catch(err => {
-              showBanner(Drupal.t('SpeedSentinel Notice'), Drupal.t('Request queued: ') + err.message);
-            })
-            .finally(() => {
-              setTimeout(() => { speedBtn.disabled = false; }, 5000);
-            });
+            .finally(() => setTimeout(() => { speedBtn.disabled = false; }, 4000));
           });
         }
 
-        // 4. Sentinel Scan Trigger & Polling
         const sentinelBtn = document.getElementById('wsc-trigger-sentinel');
         if (sentinelBtn) {
           sentinelBtn.addEventListener('click', function() {
             sentinelBtn.disabled = true;
-            showBanner(Drupal.t('Sentinel Domain Scan Started'), Drupal.t('Validating authoritative DNS records, DNSSEC, Port-25-free SPF/DMARC, and SSL certificates...'));
-
+            showBanner(Drupal.t('Sentinel Domain Scan Started'), Drupal.t('Checking authoritative DNS, DNSSEC, Port-25-free SPF/DMARC, and TLS...'));
             fetch(dashboardData.sentinelUrl || '/wsc/v1/sentinel/scan', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ domain: dashboardData.siteHost || window.location.hostname })
             })
-            .then(res => res.json())
-            .then(data => {
-              showBanner(Drupal.t('Sentinel Scan Enqueued'), Drupal.t('Scan processing in Worker Sentinel. Polling for report update...'));
-              setTimeout(pollCardsUpdate, 6000);
+            .then(r => r.json())
+            .then(d => {
+              showBanner(d.ok === false ? Drupal.t('Sentinel Notice') : Drupal.t('Sentinel Scan Enqueued'), d.error || Drupal.t('Polling for report update...'));
+              if (d.ok !== false) setTimeout(pollCardsUpdate, 6000);
             })
-            .catch(err => {
-              showBanner(Drupal.t('Sentinel Notice'), Drupal.t('Request queued: ') + err.message);
-            })
-            .finally(() => {
-              setTimeout(() => { sentinelBtn.disabled = false; }, 5000);
-            });
+            .finally(() => setTimeout(() => { sentinelBtn.disabled = false; }, 4000));
           });
         }
 
-        // 5. Polling helper to refresh cards
+        // 4. AI Coverage URL Inspector
+        const aiBtn = document.getElementById('wsc-ai-coverage-btn');
+        const aiIn = document.getElementById('wsc-ai-coverage-input');
+        const aiTf = document.getElementById('wsc-ai-coverage-timeframe');
+        const aiOut = document.getElementById('wsc-ai-coverage-result');
+        if (aiBtn && aiIn && aiOut) {
+          aiBtn.addEventListener('click', function() {
+            aiBtn.disabled = true;
+            aiOut.style.display = 'block';
+            aiOut.textContent = Drupal.t('Inspecting AI crawler activity...');
+            fetch(dashboardData.aiCoverageUrl || '/wsc/v1/ai-coverage/query', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ query: aiIn.value.trim(), timeframe: aiTf ? aiTf.value : '30d' })
+            })
+            .then(r => r.json())
+            .then(d => {
+              const total = d.total_ai_crawls !== undefined ? d.total_ai_crawls : (d.total_hits || 0);
+              const rag = d.rag_citations !== undefined ? d.rag_citations : (d.rag_hits || 0);
+              const train = d.training_scrapes !== undefined ? d.training_scrapes : (d.training_hits || 0);
+              aiOut.innerHTML = '<strong>Total AI Hits:</strong> ' + esc(total) + ' &bull; <strong>Live RAG:</strong> ' + esc(rag) + ' &bull; <strong>Training:</strong> ' + esc(train) + ' &bull; <code>' + esc(d.source || 'gateway') + '</code>';
+            })
+            .finally(() => { aiBtn.disabled = false; });
+          });
+        }
+
+        // 5. Benchmarks Refresh & Auto-Classify
+        const bmRefresh = document.getElementById('wsc-bm-refresh');
+        if (bmRefresh) {
+          bmRefresh.addEventListener('click', function() {
+            bmRefresh.disabled = true;
+            fetch(dashboardData.benchmarksUrl || '/wsc/v1/benchmarks/query').then(() => window.location.reload());
+          });
+        }
+        const bmClassify = document.getElementById('wsc-bm-classify');
+        if (bmClassify) {
+          bmClassify.addEventListener('click', function() {
+            bmClassify.disabled = true;
+            fetch(dashboardData.classifyVerticalUrl || '/wsc/v1/benchmarks/classify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+              .then(() => window.location.reload());
+          });
+        }
+
+        // 6. IndexNow Manual Push
+        const idxBtn = document.getElementById('wsc-indexnow-btn');
+        const idxIn = document.getElementById('wsc-indexnow-url');
+        const idxSt = document.getElementById('wsc-indexnow-status');
+        if (idxBtn && idxIn && idxSt) {
+          idxBtn.addEventListener('click', function() {
+            idxBtn.disabled = true;
+            idxSt.textContent = Drupal.t('Submitting URL to api.indexnow.org...');
+            fetch(dashboardData.indexNowUrl || '/wsc/v1/indexnow/submit', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ url: idxIn.value.trim() })
+            })
+            .then(r => r.json())
+            .then(d => {
+              idxSt.textContent = d.ok ? ('✓ IndexNow accepted (HTTP ' + (d.http_status || 200) + ')') : ('IndexNow: ' + (d.error || ('HTTP ' + (d.http_status || 0))));
+            })
+            .finally(() => { idxBtn.disabled = false; });
+          });
+        }
+
+        // 7. WSC License Verification & Co-Branding
+        const licBtn = document.getElementById('wsc-license-verify-btn');
+        const licIn = document.getElementById('wsc-license-input');
+        const licFb = document.getElementById('wsc-license-feedback');
+        if (licBtn && licIn && licFb) {
+          licBtn.addEventListener('click', function() {
+            licBtn.disabled = true;
+            licFb.style.display = 'block';
+            licFb.textContent = Drupal.t('Verifying credential with www.worldsearchcouncil.org...');
+            fetch(dashboardData.licenseVerifyUrl || '/wsc/v1/license/verify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ license_key: licIn.value.trim() })
+            })
+            .then(r => r.json())
+            .then(d => {
+              if (d.active) {
+                licFb.textContent = '✓ Verified (' + (d.tier || 'member') + '). Reloading...';
+                setTimeout(() => window.location.reload(), 700);
+              } else {
+                licFb.textContent = d.error || 'Verification failed.';
+              }
+            })
+            .finally(() => { licBtn.disabled = false; });
+          });
+        }
+
+        const licDisc = document.getElementById('wsc-license-disconnect-btn');
+        if (licDisc) {
+          licDisc.addEventListener('click', function() {
+            fetch(dashboardData.licenseDisconnectUrl || '/wsc/v1/license/disconnect', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+              .then(() => window.location.reload());
+          });
+        }
+
+        const cbBtn = document.getElementById('wsc-cb-save-btn');
+        if (cbBtn) {
+          cbBtn.addEventListener('click', function() {
+            cbBtn.disabled = true;
+            fetch(dashboardData.coBrandingSaveUrl || '/wsc/v1/cobranding/save', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                agency_name: (document.getElementById('wsc-cb-name') || {}).value || '',
+                agency_email: (document.getElementById('wsc-cb-email') || {}).value || '',
+                agency_url: (document.getElementById('wsc-cb-url') || {}).value || '',
+                agency_logo: (document.getElementById('wsc-cb-logo') || {}).value || ''
+              })
+            }).then(() => window.location.reload());
+          });
+        }
+
         function pollCardsUpdate() {
           fetch(dashboardData.cardsUrl || '/wsc/v1/cards')
             .then(res => res.json())
@@ -272,34 +272,23 @@
             .catch(() => {});
         }
 
-        // 6. Manual Sync Button
         const syncBtn = document.getElementById('wsc-sync-now');
         if (syncBtn) {
           syncBtn.addEventListener('click', function() {
             const originalText = syncBtn.innerHTML;
             syncBtn.disabled = true;
             syncBtn.innerHTML = '&#x21bb; ' + Drupal.t('Syncing...');
-
-            fetch(dashboardData.refreshUrl || '/wsc/v1/refresh', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' }
-            })
-            .then(res => res.json())
-            .then(data => {
-              syncBtn.innerHTML = '&#x2713; ' + Drupal.t('Done!') + ' (' + (data.synced_events || 0) + ')';
-              pollCardsUpdate();
-              setTimeout(() => {
-                syncBtn.disabled = false;
+            fetch(dashboardData.refreshUrl || '/wsc/v1/refresh', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
+              .then(res => res.json())
+              .then(data => {
+                syncBtn.innerHTML = '&#x2713; (' + (data.synced_events || 0) + ')';
+                pollCardsUpdate();
+                setTimeout(() => { syncBtn.disabled = false; syncBtn.innerHTML = originalText; }, 3000);
+              })
+              .catch(() => {
                 syncBtn.innerHTML = originalText;
-              }, 3000);
-            })
-            .catch(() => {
-              syncBtn.innerHTML = Drupal.t('Sync Failed');
-              setTimeout(() => {
                 syncBtn.disabled = false;
-                syncBtn.innerHTML = originalText;
-              }, 2000);
-            });
+              });
           });
         }
       });

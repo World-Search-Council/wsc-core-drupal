@@ -1,0 +1,60 @@
+<?php
+
+/**
+ * @file
+ * Install, update, and uninstall hooks for WSC Analytics & Bot Shield (Drupal 8–11).
+ */
+
+/**
+ * Implements hook_install().
+ */
+function wsc_analytics_install(): void {
+  $state = \Drupal::state();
+
+  // Generate local cryptographic keys strictly locally (no outbound network calls while hybrid_enabled is false).
+  if (!$state->get('wsc_analytics.local_key')) {
+    $state->set('wsc_analytics.local_key', bin2hex(random_bytes(32)));
+  }
+  if (!$state->get('wsc_analytics.project_id')) {
+    $state->set('wsc_analytics.project_id', 'wsc_drp_' . bin2hex(random_bytes(8)));
+  }
+  if (!$state->get('wsc_analytics.indexnow_key')) {
+    $state->set('wsc_analytics.indexnow_key', bin2hex(random_bytes(16)));
+  }
+
+  // Initialize local SQLite WAL schemas.
+  if (\Drupal::hasService('wsc_analytics.db_manager')) {
+    /** @var \Drupal\wsc_analytics\Service\WscDatabaseManager $db_manager */
+    $db_manager = \Drupal::service('wsc_analytics.db_manager');
+    $db_manager->initQueueSchema();
+    $db_manager->initReportsSchema();
+  }
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function wsc_analytics_uninstall(): void {
+  $state = \Drupal::state();
+  $keys = [
+    'wsc_analytics.project_id',
+    'wsc_analytics.local_key',
+    'wsc_analytics.api_secret',
+    'wsc_analytics.last_sync',
+    'wsc_analytics.last_cleanup',
+    'wsc_analytics.last_license_check',
+    'wsc_analytics.license_key',
+    'wsc_analytics.license_status',
+    'wsc_analytics.license_tier',
+    'wsc_analytics.license_holder',
+    'wsc_analytics.license_expires',
+    'wsc_analytics.license_is_demo',
+    'wsc_analytics.license_verify_url',
+    'wsc_analytics.co_branding',
+    'wsc_analytics.partners_cache',
+    'wsc_analytics.indexnow_key',
+    'wsc_analytics.indexnow_logs',
+    'wsc_analytics.vertical_meta',
+  ];
+  $state->deleteMultiple($keys);
+}

@@ -1,22 +1,45 @@
 {#
 /**
  * @file
- * WSC 7-Card Bento Analytics Dashboard template for Drupal (v2.2.0).
+ * WSC 7-Card Bento Analytics, AI Coverage, Benchmarks, /llms.txt, IndexNow & WSC Member Dashboard for Drupal 8–11 (v2.2.3).
  */
 #}
 <div class="wsc-dashboard-wrapper">
+  {# Agency Co-Branding Ribbon (Active Licensed Agency Only) #}
+  {% if membership.active and membership.co_branding.name %}
+    <div class="messages messages--status" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; margin-bottom:1rem;">
+      <span>
+        {{ 'Managed Search & AI Governance Partner:'|t }}
+        <strong>{{ membership.co_branding.name }}</strong>
+      </span>
+      <span>
+        {% if membership.co_branding.url %}
+          <a href="{{ membership.co_branding.url }}" target="_blank" rel="noopener noreferrer">{{ 'Partner Portal ↗'|t }}</a>
+        {% endif %}
+        {% if membership.co_branding.email %}
+          &bull; <a href="mailto:{{ membership.co_branding.email }}">{{ membership.co_branding.email }}</a>
+        {% endif %}
+      </span>
+    </div>
+  {% endif %}
+
   <!-- Top Navigation & Diagnostic Controls -->
   <div class="wsc-dashboard-header">
     <div class="wsc-header-titles">
-      <h2>{{ 'WSC Analytics & Bot Shield'|t }} <span class="wsc-version-tag">v2.2.0</span></h2>
+      <h2>
+        {{ 'WSC Analytics & Search Health'|t }}
+        <span class="wsc-version-tag">v2.2.3</span>
+        {% if membership.active %}
+          <span class="wsc-badge wsc-badge-human">✓ WSC {{ membership.tier|upper }}</span>
+        {% endif %}
+      </h2>
       <p class="wsc-header-meta">
         {{ 'Project ID:'|t }} <code>{{ project_id }}</code> &bull;
         {{ 'Host:'|t }} <strong>{{ site_host }}</strong> &bull;
-        {{ 'Last Sync:'|t }} <span id="wsc-last-sync-val">{{ last_sync }}</span>
+        {{ 'Sync:'|t }} <span id="wsc-last-sync-val">{{ last_sync }}</span>
       </p>
     </div>
     <div class="wsc-header-actions">
-      <!-- Multi-Period Selector -->
       <div class="wsc-period-toggle" role="group" aria-label="{{ 'Period Selection'|t }}">
         <button type="button" class="wsc-toggle-btn" data-period="1d">1 {{ 'Day'|t }}</button>
         <button type="button" class="wsc-toggle-btn active" data-period="7d">7 {{ 'Days'|t }}</button>
@@ -25,7 +48,6 @@
         <button type="button" class="wsc-toggle-btn" data-period="365d">1 {{ 'Year'|t }}</button>
       </div>
 
-      <!-- Action Diagnostic Triggers -->
       <button type="button" class="button button--secondary wsc-btn-diagnostic" id="wsc-trigger-pagespeed" title="{{ 'Trigger SpeedSentinel 2.0 Core Web Vitals Lab Audit'|t }}">
         <span>⚡</span> {{ 'Speed Audit'|t }}
       </button>
@@ -46,10 +68,29 @@
     </div>
   </div>
 
+  <!-- AI Coverage URL Inspector Bar -->
+  <div class="wsc-card" style="margin-bottom: 1.25rem;">
+    <div class="wsc-card-body" style="display:flex; flex-wrap:wrap; gap:0.75rem; align-items:center; justify-content:space-between;">
+      <div>
+        <h3 style="margin:0; font-size:1rem;">🤖 {{ 'AI Coverage URL Inspector'|t }}</h3>
+        <small class="text-muted">{{ 'Verify ChatGPT, Perplexity & Claude RAG crawl coverage per Drupal URL'|t }}</small>
+      </div>
+      <div style="display:flex; gap:0.5rem; flex:1; min-width:280px; justify-content:flex-end;">
+        <input type="text" id="wsc-ai-coverage-input" class="form-text" style="flex:1; max-width:420px;" value="{{ site_url }}/">
+        <select id="wsc-ai-coverage-timeframe" class="form-select" style="width:90px;">
+          <option value="7d">7d</option>
+          <option value="30d" selected>30d</option>
+        </select>
+        <button type="button" class="button button--primary" id="wsc-ai-coverage-btn">{{ 'Inspect URL'|t }}</button>
+      </div>
+      <div id="wsc-ai-coverage-result" style="width:100%; display:none; padding-top:0.5rem; border-top:1px solid #e2e8f0;"></div>
+    </div>
+  </div>
+
   {% if not has_data %}
-    <div class="messages messages--warning wsc-empty-notice">
-      <p><strong>{{ 'No remote analytics data received yet.'|t }}</strong></p>
-      <p>{{ 'Local telemetry is being collected into the SQLite queue and synchronized during cron runs or when clicking "Sync Now".'|t }}</p>
+    <div class="messages messages--status wsc-empty-notice">
+      <p><strong>{{ 'Local Zero-PII SQLite WAL Mode Active.'|t }}</strong></p>
+      <p>{{ 'Visitor telemetry and AI crawler hits are stored locally in SQLite WAL. Enable Opt-In Hybrid Sync in Settings whenever you want remote ClickHouse 7-Card rollups.'|t }}</p>
     </div>
   {% endif %}
 
@@ -59,7 +100,7 @@
     <div class="wsc-card wsc-card-interactive" id="wsc-card-1" data-card="traffic">
       <div class="wsc-card-header">
         <h3>1. {{ 'Traffic & Acquisition'|t }}</h3>
-        <span class="wsc-badge wsc-badge-human">{{ 'Human Only'|t }}</span>
+        <span class="wsc-badge wsc-badge-human">{{ 'Zero-PII Human'|t }}</span>
       </div>
       <div class="wsc-card-body">
         <div class="wsc-metrics-row">
@@ -80,10 +121,10 @@
         <div class="wsc-channel-breakdown">
           <h4>{{ 'Acquisition Channels'|t }}</h4>
           <div class="wsc-channel-bar">
-            <div class="wsc-bar-seg seg-ai" style="width: {{ card1.data_7d.channels.ai_pct|default(0) }}%" title="AI: {{ card1.data_7d.channels.ai_pct|default(0) }}%"></div>
-            <div class="wsc-bar-seg seg-search" style="width: {{ card1.data_7d.channels.search_pct|default(0) }}%" title="Search: {{ card1.data_7d.channels.search_pct|default(0) }}%"></div>
-            <div class="wsc-bar-seg seg-social" style="width: {{ card1.data_7d.channels.social_pct|default(0) }}%" title="Social: {{ card1.data_7d.channels.social_pct|default(0) }}%"></div>
-            <div class="wsc-bar-seg seg-direct" style="width: {{ card1.data_7d.channels.direct_pct|default(0) }}%" title="Direct: {{ card1.data_7d.channels.direct_pct|default(0) }}%"></div>
+            <div class="wsc-bar-seg seg-ai" style="width: {{ card1.data_7d.channels.ai_pct|default(0) }}%"></div>
+            <div class="wsc-bar-seg seg-search" style="width: {{ card1.data_7d.channels.search_pct|default(0) }}%"></div>
+            <div class="wsc-bar-seg seg-social" style="width: {{ card1.data_7d.channels.social_pct|default(0) }}%"></div>
+            <div class="wsc-bar-seg seg-direct" style="width: {{ card1.data_7d.channels.direct_pct|default(0) }}%"></div>
           </div>
           <div class="wsc-channel-legend">
             <span class="legend-item"><span class="dot dot-ai"></span> AI ({{ card1.data_7d.channels.ai_pct|default(0) }}%)</span>
@@ -186,22 +227,10 @@
         </div>
 
         <div class="wsc-milestones-list" style="margin-top: 1rem;">
-          <div class="wsc-milestone-row">
-            <small>25% {{ 'Scroll (Lead/Teaser)'|t }}</small>
-            <span class="badge bg-secondary">{{ card_engagement.data_7d.scroll_25|default('92%') }}</span>
-          </div>
-          <div class="wsc-milestone-row">
-            <small>50% {{ 'Scroll (Body)'|t }}</small>
-            <span class="badge bg-secondary">{{ card_engagement.data_7d.scroll_50|default('74%') }}</span>
-          </div>
-          <div class="wsc-milestone-row">
-            <small>75% {{ 'Scroll (Conclusion)'|t }}</small>
-            <span class="badge bg-secondary">{{ card_engagement.data_7d.scroll_75|default('48%') }}</span>
-          </div>
-          <div class="wsc-milestone-row">
-            <small>100% {{ 'Scroll (Complete)'|t }}</small>
-            <span class="badge bg-secondary">{{ card_engagement.data_7d.scroll_100|default('26%') }}</span>
-          </div>
+          <div class="wsc-milestone-row"><small>25% {{ 'Scroll'|t }}</small><span class="badge bg-secondary">{{ card_engagement.data_7d.scroll_25|default('92%') }}</span></div>
+          <div class="wsc-milestone-row"><small>50% {{ 'Scroll'|t }}</small><span class="badge bg-secondary">{{ card_engagement.data_7d.scroll_50|default('74%') }}</span></div>
+          <div class="wsc-milestone-row"><small>75% {{ 'Scroll'|t }}</small><span class="badge bg-secondary">{{ card_engagement.data_7d.scroll_75|default('48%') }}</span></div>
+          <div class="wsc-milestone-row"><small>100% {{ 'Scroll'|t }}</small><span class="badge bg-secondary">{{ card_engagement.data_7d.scroll_100|default('26%') }}</span></div>
         </div>
       </div>
       <div class="wsc-card-footer">
@@ -216,17 +245,11 @@
         <span class="wsc-badge wsc-badge-outbound">{{ 'Nav Intelligence'|t }}</span>
       </div>
       <div class="wsc-card-body">
-        <p class="wsc-card-description">
-          {{ 'Monitors departing reader journeys to external partners, social media profiles, and reference portals.'|t }}
-        </p>
+        <p class="wsc-card-description">{{ 'Monitors departing reader journeys to external partners, social profiles, and reference portals.'|t }}</p>
         <div class="wsc-category-chips">
           <span class="badge bg-light text-dark">📱 {{ 'Social:'|t }} 40%</span>
           <span class="badge bg-light text-dark">💼 {{ 'Jobs:'|t }} 35%</span>
           <span class="badge bg-light text-dark">🔗 {{ 'References:'|t }} 25%</span>
-        </div>
-        <div class="wsc-top-domains" style="margin-top: 1rem;">
-          <small class="text-muted">{{ 'Top Destination Domains:'|t }}</small>
-          <p class="mb-0"><code>instagram.com</code>, <code>linkedin.com</code>, <code>github.com</code></p>
         </div>
       </div>
       <div class="wsc-card-footer">
@@ -237,34 +260,15 @@
     <!-- Card 6: Conversion Funnel & Commerce -->
     <div class="wsc-card wsc-card-interactive" id="wsc-card-6" data-card="ecommerce">
       <div class="wsc-card-header">
-        <h3>6. {{ 'Conversion Funnel & Forms'|t }}</h3>
+        <h3>6. {{ 'Conversion Funnel & Commerce'|t }}</h3>
         <span class="wsc-badge wsc-badge-funnel">{{ 'Ad-Blocker Proof'|t }}</span>
       </div>
       <div class="wsc-card-body">
         <div class="wsc-funnel-stages">
-          <div class="wsc-funnel-step">
-            <span class="step-num">1</span>
-            <span class="step-label">{{ 'Page Views'|t }}</span>
-            <strong class="step-val">{{ card_ecommerce.data_7d.product_views|default('2,410') }}</strong>
-          </div>
-          <div class="wsc-funnel-step">
-            <span class="step-num">2</span>
-            <span class="step-label">{{ 'Engaged Intent'|t }}</span>
-            <strong class="step-val">{{ card_ecommerce.data_7d.add_to_cart|default('480') }}</strong>
-          </div>
-          <div class="wsc-funnel-step">
-            <span class="step-num">3</span>
-            <span class="step-label">{{ 'Form / Step Start'|t }}</span>
-            <strong class="step-val">{{ card_ecommerce.data_7d.checkout_started|default('210') }}</strong>
-          </div>
-          <div class="wsc-funnel-step step-complete">
-            <span class="step-num">4</span>
-            <span class="step-label">{{ 'Conversions'|t }}</span>
-            <strong class="step-val text-success">{{ card_ecommerce.data_7d.purchases|default('115') }}</strong>
-          </div>
-        </div>
-        <div class="wsc-funnel-rate" style="margin-top: 0.75rem;">
-          <small class="text-muted">{{ 'Conversion Rate:'|t }} <strong>{{ card_ecommerce.data_7d.conversion_rate|default('4.7%') }}</strong> &bull; {{ 'Abandonment Leak:'|t }} <strong>{{ card_ecommerce.data_7d.abandonment_rate|default('54.2%') }}</strong></small>
+          <div class="wsc-funnel-step"><span class="step-num">1</span><span class="step-label">{{ 'Views'|t }}</span><strong class="step-val">{{ card_ecommerce.data_7d.product_views|default('2,410') }}</strong></div>
+          <div class="wsc-funnel-step"><span class="step-num">2</span><span class="step-label">{{ 'Intent'|t }}</span><strong class="step-val">{{ card_ecommerce.data_7d.add_to_cart|default('480') }}</strong></div>
+          <div class="wsc-funnel-step"><span class="step-num">3</span><span class="step-label">{{ 'Checkout'|t }}</span><strong class="step-val">{{ card_ecommerce.data_7d.checkout_started|default('210') }}</strong></div>
+          <div class="wsc-funnel-step step-complete"><span class="step-num">4</span><span class="step-label">{{ 'Completed'|t }}</span><strong class="step-val text-success">{{ card_ecommerce.data_7d.purchases|default('115') }}</strong></div>
         </div>
       </div>
       <div class="wsc-card-footer">
@@ -272,56 +276,137 @@
       </div>
     </div>
 
-    <!-- Card 7: Sentinel Domain Health & Infrastructure -->
+    <!-- Card 7: Sentinel Domain Health & SpeedSentinel 2.0 -->
     <div class="wsc-card wsc-card-interactive wsc-card-full-width" id="wsc-card-7" data-card="sentinel">
       <div class="wsc-card-header">
         <div>
-          <h3>7. {{ 'Sentinel Domain Health & Infrastructure'|t }}</h3>
-          <small class="text-muted">{{ 'Authoritative DNS, DNSSEC, Port-25 Free Email Security & TLS Restlaufzeit'|t }}</small>
+          <h3>7. {{ 'Sentinel Domain Health & SpeedSentinel 2.0 Dual-Thermometer'|t }}</h3>
+          <small class="text-muted">{{ 'Authoritative DNS, DNSSEC, Port-25-Free Email Security, TLS & RAG vs. Human CWV'|t }}</small>
         </div>
         <div class="wsc-header-status">
+          <span class="wsc-badge wsc-badge-ai">🤖 RAG: {{ pagespeed.rag_score|default(94) }}/100</span>
+          <span class="wsc-badge wsc-badge-ux">👤 CWV: {{ pagespeed.human_score|default(89) }}/100</span>
           <span class="wsc-badge wsc-badge-score">{{ domain_health.score|default(92) }}/100</span>
           <span class="wsc-badge wsc-badge-healthy">{{ domain_health.status|default('HEALTHY')|t }}</span>
         </div>
       </div>
       <div class="wsc-card-body">
         <div class="wsc-sentinel-grid">
-          <div class="wsc-sentinel-col">
-            <span class="sentinel-col-title">{{ 'Nameservers'|t }}</span>
-            <strong class="text-success">{{ domain_health.dns.redundancy|default('✓ 2 Nameservers') }}</strong>
-            <small class="text-muted">{{ 'Authoritative Redundancy'|t }}</small>
-          </div>
-          <div class="wsc-sentinel-col">
-            <span class="sentinel-col-title">{{ 'DNSSEC'|t }}</span>
-            <strong class="text-success">{{ domain_health.dns.dnssec|default('✓ Active & Validated') }}</strong>
-            <small class="text-muted">{{ 'Cryptographic Integrity'|t }}</small>
-          </div>
-          <div class="wsc-sentinel-col">
-            <span class="sentinel-col-title">{{ 'Email Security'|t }}</span>
-            <strong class="text-success">{{ domain_health.mail.summary|default('✓ SPF & DMARC Enforced') }}</strong>
-            <small class="text-muted">{{ 'DNS Authoritative (No Port 25)'|t }}</small>
-          </div>
-          <div class="wsc-sentinel-col">
-            <span class="sentinel-col-title">{{ 'SSL / TLS'|t }}</span>
-            <strong class="text-success">{{ domain_health.ssl.days_remaining|default('64 Days Remaining') }}</strong>
-            <small class="text-muted">{{ 'Certificate Valid'|t }}</small>
-          </div>
+          <div class="wsc-sentinel-col"><span class="sentinel-col-title">{{ 'Nameservers'|t }}</span><strong class="text-success">{{ domain_health.dns.redundancy|default('✓ 2 Nameservers') }}</strong></div>
+          <div class="wsc-sentinel-col"><span class="sentinel-col-title">{{ 'DNSSEC'|t }}</span><strong class="text-success">{{ domain_health.dns.dnssec|default('✓ Active & Validated') }}</strong></div>
+          <div class="wsc-sentinel-col"><span class="sentinel-col-title">{{ 'Email Security'|t }}</span><strong class="text-success">{{ domain_health.mail.summary|default('✓ SPF & DMARC Enforced') }}</strong></div>
+          <div class="wsc-sentinel-col"><span class="sentinel-col-title">{{ 'SSL / TLS'|t }}</span><strong class="text-success">{{ domain_health.ssl.days_remaining|default('64 Days Remaining') }}</strong></div>
         </div>
-      </div>
-      <div class="wsc-card-footer">
-        <small>{{ 'Click to view complete DNS, TLS & security header diagnostics'|t }} &darr;</small>
       </div>
     </div>
   </div>
 
-  <!-- Bottom Row: Progressive Disclosure Detail Panel -->
+  <!-- Detail Panel -->
   <div class="wsc-detail-panel" id="wsc-detail-panel" style="display:none;">
     <div class="wsc-detail-header">
       <h3 id="wsc-detail-title">{{ 'Detailed Analysis'|t }}</h3>
       <button type="button" class="wsc-close-detail" id="wsc-close-detail">&times;</button>
     </div>
-    <div class="wsc-detail-content" id="wsc-detail-content">
-      <!-- Injected via JavaScript -->
+    <div class="wsc-detail-content" id="wsc-detail-content"></div>
+  </div>
+
+  <!-- Governance Row: Industry Benchmarks + /llms.txt & IndexNow + Live WSC Member Console -->
+  <div class="wsc-bento-grid" style="margin-top: 1.5rem;">
+    <!-- Benchmarks & AI Readiness -->
+    <div class="wsc-card">
+      <div class="wsc-card-header">
+        <div>
+          <h3>📊 {{ 'Industry Benchmarks & AI Readiness'|t }}</h3>
+          <small class="text-muted">{{ 'Vertical:'|t }} <code id="wsc-bm-vertical">{{ benchmarks.vertical|default('/Business & Industrial/Services') }}</code> ({{ benchmarks.source|default('local_baseline') }})</small>
+        </div>
+        <div>
+          <button type="button" class="button button--small" id="wsc-bm-classify">{{ 'Auto-Classify'|t }}</button>
+          <button type="button" class="button button--small" id="wsc-bm-refresh">{{ 'Refresh'|t }}</button>
+        </div>
+      </div>
+      <div class="wsc-card-body">
+        <table class="responsive-enabled" id="wsc-bm-table">
+          <thead><tr><th>{{ 'Metric (30d)'|t }}</th><th>{{ 'Your Site'|t }}</th><th>{{ 'Peer Median'|t }}</th></tr></thead>
+          <tbody>
+            <tr><td>{{ 'AI Live RAG Share'|t }}</td><td><strong>{{ benchmarks.metrics.ai_rag_share.site|default(0) }}%</strong></td><td>{{ benchmarks.metrics.ai_rag_share.peer_median|default(24) }}%</td></tr>
+            <tr><td>{{ 'Avg. Engaged Time'|t }}</td><td><strong>{{ benchmarks.metrics.engaged_time.site|default(44) }}s</strong></td><td>{{ benchmarks.metrics.engaged_time.peer_median|default(58) }}s</td></tr>
+            <tr><td>{{ 'AI Citation Coverage'|t }}</td><td><strong>{{ benchmarks.metrics.ai_coverage_pct.site|default(30) }}%</strong></td><td>{{ benchmarks.metrics.ai_coverage_pct.peer_median|default(61) }}%</td></tr>
+          </tbody>
+        </table>
+
+        <div style="margin-top:1rem; padding-top:0.75rem; border-top:1px solid #e2e8f0;">
+          <p style="margin:0 0 0.5rem 0;">
+            <strong>🚀 {{ '/llms.txt & IndexNow Studio'|t }}:</strong>
+            <a href="{{ site_url }}/llms.txt" target="_blank" rel="noopener noreferrer">/llms.txt {{ llms_txt_enabled ? '✓' : '(Off)' }} ↗</a> &bull;
+            <a href="{{ site_url }}/{{ indexnow_key }}.txt" target="_blank" rel="noopener noreferrer">{{ 'IndexNow Key ↗'|t }}</a>
+          </p>
+          <div style="display:flex; gap:0.5rem;">
+            <input type="text" class="form-text" id="wsc-indexnow-url" style="flex:1;" value="{{ site_url }}/">
+            <button type="button" class="button button--small" id="wsc-indexnow-btn">{{ 'Push IndexNow'|t }}</button>
+          </div>
+          <small id="wsc-indexnow-status" class="text-muted">
+            {{ indexnow_enabled ? 'Auto-push on node save: Enabled.'|t : 'Auto-push on node save: Opt-in via Settings.'|t }}
+          </small>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live WSC Membership & Agency Co-Branding -->
+    <div class="wsc-card">
+      <div class="wsc-card-header">
+        <div>
+          <h3>🏛️ {{ 'World Search Council Membership'|t }}</h3>
+          <small class="text-muted">{{ 'Live credential verification with www.worldsearchcouncil.org'|t }}</small>
+        </div>
+        <span class="wsc-badge {{ membership.active ? 'wsc-badge-human' : 'wsc-badge-outbound' }}">
+          {{ membership.active ? 'Verified Active'|t : 'Community Edition'|t }}
+        </span>
+      </div>
+      <div class="wsc-card-body">
+        <div style="display:flex; gap:0.5rem; margin-bottom:0.75rem;">
+          <input type="text" class="form-text" id="wsc-license-input" style="flex:1;" value="{{ membership.license_key }}" placeholder="WSC-MEMBER-XXXX-XXXX or WSC-MEMBER-DEMO">
+          <button type="button" class="button button--primary button--small" id="wsc-license-verify-btn">{{ 'Verify Key'|t }}</button>
+          {% if membership.active %}
+            <button type="button" class="button button--danger button--small" id="wsc-license-disconnect-btn">{{ 'Disconnect'|t }}</button>
+          {% endif %}
+        </div>
+        <div id="wsc-license-feedback" style="display:none; margin-bottom:0.75rem;"></div>
+
+        {% if membership.active %}
+          <p>
+            <strong>{{ 'Holder:'|t }}</strong> {{ membership.holder }} &bull;
+            <strong>{{ 'Tier:'|t }}</strong> <code>{{ membership.tier }}</code><br>
+            <a href="{{ membership.verify_url }}" target="_blank" rel="noopener noreferrer">{{ 'Verify Credential ↗'|t }}</a> &bull;
+            <a href="https://www.worldsearchcouncil.org/member" target="_blank" rel="noopener noreferrer">{{ 'Open Member Console ↗'|t }}</a>
+          </p>
+          {% if membership.is_agency %}
+            <div style="padding-top:0.5rem; border-top:1px solid #e2e8f0;">
+              <strong>{{ 'Agency Co-Branding Sync'|t }}</strong>
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; margin:0.5rem 0;">
+                <input type="text" class="form-text" id="wsc-cb-name" value="{{ membership.co_branding.name }}" placeholder="Agency Name">
+                <input type="email" class="form-text" id="wsc-cb-email" value="{{ membership.co_branding.email }}" placeholder="support@agency.tld">
+                <input type="url" class="form-text" id="wsc-cb-url" value="{{ membership.co_branding.url }}" placeholder="https://agency.tld">
+                <input type="url" class="form-text" id="wsc-cb-logo" value="{{ membership.co_branding.logo }}" placeholder="https://agency.tld/logo.png">
+              </div>
+              <button type="button" class="button button--small" id="wsc-cb-save-btn">{{ 'Sync Co-Branding'|t }}</button>
+            </div>
+          {% endif %}
+        {% else %}
+          <p class="text-muted">{{ 'All local PHP analytics, Drupal Views integration, /llms.txt, and IndexNow features are 100% unlocked. Connect a WSC credential for multi-domain fleet governance, WTP attestation, and a 100% ad-free console.'|t }}</p>
+          <p>
+            <a href="https://www.worldsearchcouncil.org/join" target="_blank" rel="noopener noreferrer">{{ 'Join the Council ↗'|t }}</a> &bull;
+            <a href="https://www.worldsearchcouncil.org/directory" target="_blank" rel="noopener noreferrer">{{ 'Partner Directory ↗'|t }}</a>
+          </p>
+          {% if featured_partners %}
+            <div style="padding-top:0.5rem; border-top:1px solid #e2e8f0;">
+              <small><strong>{{ 'Featured Certified WSC Partners:'|t }}</strong></small><br>
+              {% for partner in featured_partners|slice(0, 3) %}
+                <a href="{{ partner.url|default('https://www.worldsearchcouncil.org/directory') }}" target="_blank" rel="noopener noreferrer" style="margin-right:0.75rem;">{{ partner.name|default('WSC Partner') }} ↗</a>
+              {% endfor %}
+            </div>
+          {% endif %}
+        {% endif %}
+      </div>
     </div>
   </div>
 </div>

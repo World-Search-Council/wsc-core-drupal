@@ -7,9 +7,11 @@ use Drupal\wsc_analytics\Service\WscCoreService;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Controller for client-side telemetry ingestion and gateway webhook callbacks.
+ * Controller for Zero-PII telemetry ingestion, Gateway webhooks, AI Coverage,
+ * Benchmarks, WSC Membership, /llms.txt, and IndexNow in Drupal 8–11 (v2.2.3).
  */
 class WscApiController extends ControllerBase {
 
@@ -30,7 +32,22 @@ class WscApiController extends ControllerBase {
   }
 
   /**
-   * Ingest client-side micro-batch telemetry from wsc-tracker.js.
+   * Public machine-readable /llms.txt AI Manifest endpoint.
+   */
+  public function serveLlmsTxt(): Response {
+    $config = $this->config('wsc_analytics.settings');
+    if (!$config->get('llms_txt_enabled')) {
+      return new Response('404 Not Found', 404, ['Content-Type' => 'text/plain; charset=utf-8']);
+    }
+
+    return new Response($this->core->generateLlmsTxt(), 200, [
+      'Content-Type'  => 'text/markdown; charset=utf-8',
+      'Cache-Control' => 'public, max-age=3600',
+    ]);
+  }
+
+  /**
+   * Ingest client-side micro-batch telemetry from wsc-tracker.js (Zero-PII).
    */
   public function track(Request $request): JsonResponse {
     $raw_content = $request->getContent();
@@ -43,11 +60,9 @@ class WscApiController extends ControllerBase {
       return new JsonResponse(['ok' => false, 'error' => 'invalid_format'], 400);
     }
 
-    $ip = $request->getClientIp();
+    $raw_ip = $request->getClientIp();
     $ua = $request->headers->get('User-Agent') ?: '';
-    $ch_brand = $request->headers->get('Sec-CH-UA') ?: '';
-    $ch_mobile = $request->headers->get('Sec-CH-UA-Mobile') ?: '';
-    $ch_platform = $request->headers->get('Sec-CH-UA-Platform') ?: '';
+    $ip_hash = $this->core->hashClientIp($raw_ip, $ua);
 
     $count = 0;
     foreach ($data['events'] as $item) {
@@ -60,12 +75,9 @@ class WscApiController extends ControllerBase {
       $referrer   = (string) ($item['r'] ?? '');
       $meta       = is_array($item['m'] ?? null) ? $item['m'] : [];
 
-      // Enrich meta with client environment headers
-      $meta['ip']          = $ip;
-      $meta['user_agent']  = $ua;
-      if ($ch_brand)    $meta['sec_ch_ua'] = $ch_brand;
-      if ($ch_mobile)   $meta['sec_ch_ua_mobile'] = $ch_mobile;
-      if ($ch_platform) $meta['sec_ch_ua_platform'] = $ch_platform;
+      unset($meta['ip']);
+      $meta['ip_hash'] = $ip_hash;
+      $meta['user_agent'] = substr($ua, 0, 255);
 
       if ($this->core->trackEvent($event_type, $url_path, $referrer, $meta)) {
         $count++;
@@ -76,17 +88,17 @@ class WscApiController extends ControllerBase {
   }
 
   /**
-   * Handle incoming 3-Card reports webhook from WSC Gateway.
+   * Handle incoming 7-Card reports webhook from WSC Gateway.
    */
   public function handleWebhook(Request $request): JsonResponse {
-    $raw_content = $request->getContent();
+    $raw_content = (string) $request->getContent();
     $signature   = $request->headers->get('X-WSC-Sig') ?: '';
 
     $creds = $this->core->getProjectCredentials();
+    $secret = !empty($creds['api_secret']) ? $creds['api_secret'] : $creds['local_key'];
+    $expected_sig = hash_hmac('sha256', $raw_content, $secret);
 
-    // Verify HMAC-SHA256 signature
-    $expected_sig = hash_hmac('sha256', $raw_content, $creds['local_key']);
-    if (!hash_equals($expected_sig, $signature)) {
+    if ($signature === '' || !hash_equals($expected_sig, $signature)) {
       return new JsonResponse(['ok' => false, 'error' => 'invalid_signature'], 403);
     }
 
@@ -96,89 +108,81 @@ class WscApiController extends ControllerBase {
     }
 
     $saved = $this->core->saveWebhookReport($data);
-
     return new JsonResponse(['ok' => $saved]);
   }
 
   /**
-   * Proxies AI Coverage / URL Inspection queries to WSC Gateway.
+   * Query AI Coverage URL Inspector (Gateway + local SQLite fallback).
    */
   public function aiCoverage(Request $request): JsonResponse {
-    $raw_content = $request->getContent();
-    $data = json_decode($raw_content, true);
-
+    $data = json_decode((string) $request->getContent(), true) ?: [];
     $query_url = trim((string) ($data['query'] ?? ''));
     $timeframe = trim((string) ($data['timeframe'] ?? '30d'));
 
-    if (empty($query_url)) {
+    if ($query_url === '') {
       return new JsonResponse(['ok' => false, 'error' => 'query_required'], 400);
     }
 
-    $creds = $this->core->getProjectCredentials();
-    if (empty($creds['project_id']) || empty($creds['api_secret'])) {
-      return new JsonResponse(['ok' => false, 'error' => 'not_configured'], 400);
-    }
-
-    $payload = json_encode([
-      'project_id' => $creds['project_id'],
-      'query'      => $query_url,
-      'timeframe'  => in_array($timeframe, ['7d', '30d'], true) ? $timeframe : '30d',
-    ]);
-
-    $signature = hash_hmac('sha256', $payload, $creds['api_secret']);
-
-    try {
-      $client = \Drupal::httpClient();
-      $response = $client->post('https://api.worldsearchcouncil.org/v1/ai-coverage/query', [
-        'headers' => [
-          'Content-Type' => 'application/json',
-          'X-WSC-Sig'    => $signature,
-        ],
-        'body'    => $payload,
-        'timeout' => 10,
-      ]);
-
-      $result = json_decode((string) $response->getBody(), true);
-      return new JsonResponse($result);
-    }
-    catch (\Exception $e) {
-      return new JsonResponse(['ok' => false, 'error' => $e->getMessage()], 502);
-    }
+    return new JsonResponse($this->core->queryAiCoverage($query_url, $timeframe));
   }
 
-  /**
-   * Get current cached 7-Card Suite as JSON for frontend updates.
-   */
   public function getCards(): JsonResponse {
-    $cards = $this->core->getDashboardCards();
-    return new JsonResponse(['ok' => true, 'cards' => $cards]);
+    return new JsonResponse(['ok' => true, 'cards' => $this->core->getDashboardCards()]);
   }
 
-  /**
-   * Trigger SpeedSentinel 2.0 Lab Audit.
-   */
   public function triggerPagespeedAudit(Request $request): JsonResponse {
-    $raw_content = $request->getContent();
-    $data = json_decode($raw_content, true) ?: [];
-
+    $data = json_decode((string) $request->getContent(), true) ?: [];
     $url = trim((string) ($data['url'] ?? $request->getSchemeAndHttpHost()));
     $strategy = in_array($data['strategy'] ?? '', ['mobile', 'desktop'], true) ? $data['strategy'] : 'mobile';
 
     $result = $this->core->triggerSpeedSentinelAudit($url, $strategy);
-    return new JsonResponse($result, ($result['ok'] ?? false) ? 202 : 400);
+    return new JsonResponse($result, !empty($result['ok']) ? 202 : 400);
   }
 
-  /**
-   * Trigger Sentinel Domain Health Scan.
-   */
   public function triggerSentinelScan(Request $request): JsonResponse {
-    $raw_content = $request->getContent();
-    $data = json_decode($raw_content, true) ?: [];
-
+    $data = json_decode((string) $request->getContent(), true) ?: [];
     $domain = trim((string) ($data['domain'] ?? $request->getHost()));
 
     $result = $this->core->triggerSentinelScan($domain);
-    return new JsonResponse($result, ($result['ok'] ?? false) ? 202 : 400);
+    return new JsonResponse($result, !empty($result['ok']) ? 202 : 400);
+  }
+
+  public function getBenchmarks(): JsonResponse {
+    return new JsonResponse($this->core->getIndustryBenchmarks(true));
+  }
+
+  public function classifyBenchmark(): JsonResponse {
+    return new JsonResponse($this->core->classifyBenchmarkVertical());
+  }
+
+  public function verifyLicense(Request $request): JsonResponse {
+    $data = json_decode((string) $request->getContent(), true) ?: [];
+    $key = trim((string) ($data['license_key'] ?? ''));
+    $cb = is_array($data['co_branding'] ?? null) ? $data['co_branding'] : null;
+    $res = $this->core->verifyLicense($key, $cb);
+    return new JsonResponse($res, !empty($res['ok']) ? 200 : 400);
+  }
+
+  public function disconnectLicense(): JsonResponse {
+    return new JsonResponse($this->core->disconnectLicense());
+  }
+
+  public function saveCoBranding(Request $request): JsonResponse {
+    $data = json_decode((string) $request->getContent(), true) ?: [];
+    $state = $this->core->getMembershipState();
+    $res = $this->core->verifyLicense($state['license_key'], [
+      'name'  => $data['agency_name'] ?? '',
+      'url'   => $data['agency_url'] ?? '',
+      'email' => $data['agency_email'] ?? '',
+      'logo'  => $data['agency_logo'] ?? '',
+    ]);
+    return new JsonResponse($res, !empty($res['ok']) ? 200 : 400);
+  }
+
+  public function submitIndexNow(Request $request): JsonResponse {
+    $data = json_decode((string) $request->getContent(), true) ?: [];
+    $url = trim((string) ($data['url'] ?? $request->getSchemeAndHttpHost()));
+    $res = $this->core->submitIndexNow([$url], 'manual');
+    return new JsonResponse($res, !empty($res['ok']) ? 200 : 400);
   }
 }
-
