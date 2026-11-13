@@ -1,31 +1,42 @@
-# WSC Analytics & Bot Shield for Drupal (Drupal 10 / 11)
+# WSC Analytics & AI Bot Shield for Drupal (`v2.2.0` — Drupal 8 / 9 / 10 / 11)
 
-Official Drupal integration of the **World Search Council (WSC) Hybrid Analytics & AI Bot Shield Standard**.
+<p align="center">
+  <strong>Official Drupal Connector of the World Search Council (WSC) Standard</strong><br>
+  100% Cookieless Analytics, HTTP Kernel AI Crawler Sensor, Canonical 7-Card Bento Suite, SpeedSentinel 2.0 & Drupal Views/Charts Integration
+</p>
 
-Provides cookieless, privacy-first web analytics, deep AI crawler tracking at the HTTP kernel layer, automated AES-256 encrypted micro-batch synchronization to the WSC Gateway, and native integration with **Drupal Views** and the **Drupal Charts module** (`drupal/charts`).
+<p align="center">
+  <a href="https://www.worldsearchcouncil.org"><img src="https://img.shields.io/badge/Portal-worldsearchcouncil.org-0F172A?style=flat-square" alt="World Search Council"></a>
+  <img src="https://img.shields.io/badge/Version-2.2.0-0678BE?style=flat-square&logo=drupal" alt="Drupal v2.2.0">
+  <img src="https://img.shields.io/badge/Drupal-8_|_9_|_10_|_11-0678BE?style=flat-square" alt="Drupal 8-11">
+  <img src="https://img.shields.io/badge/Privacy-100%25_Cookieless-10B981?style=flat-square" alt="Cookieless">
+  <img src="https://img.shields.io/badge/License-GPL--2.0--or--later-orange?style=flat-square" alt="License">
+</p>
 
 ---
 
-## 🌟 Key Features
+## 🌟 Key Features (`v2.2.0`)
 
-* **Cookieless Privacy-First Tracking**: 100% GDPR, TTDSG/TDDDG, and ePrivacy compliant without requiring annoying cookie banners.
-* **Dual-Layer Architecture**:
-  * **Edge Sensor (`WscRequestSubscriber`)**: Intercepts AI crawlers (`GPTBot`, `ClaudeBot`, `ChatGPT-User`, `Perplexity`, etc.) and search engines (`Googlebot`, `Bingbot`) in real time before response rendering.
-  * **Client Runtime (`wsc-tracker.js`)**: Pure Vanilla JS (< 4 KB) with automated micro-batching (5s intervals / 10 events) and `sendBeacon` lifecycle flush.
-* **Local SQLite Queuing & WAL Acceleration**:
-  * Writes into `queue_temp.sqlite` without creating database lock overhead on main Drupal MySQL/Postgres instances.
-  * Isolated `reports_temp.sqlite` stores aggregated 3-Card dashboard metrics.
-* **Drupal Views & Charts Integration (`hook_views_data`)**:
-  * Exposes reporting tables (`wsc_daily_overview`, `wsc_bot_stats`, `wsc_top_pages`) directly to **Drupal Views**.
-  * Fully compatible with the contributed **Drupal Charts module** (`drupal/charts`) supporting **Apache ECharts**, **Chart.js**, **Highcharts**, and **Google Charts**.
-* **3-Card Anti-GA4 Smart Dashboard**:
-  * **Card 1**: Traffic & Acquisition Channels (AI Search Citations, Organic Search, Social, Direct, Referral).
-  * **Card 2**: Strategic Human Insights & Anomaly Detection.
-  * **Card 3**: Bot Shield Sensor Network & Data Quality.
-  * Progressive disclosure detail row with 7-day and 30-day toggles.
-* **Cryptographic Security**:
-  * Payloads encrypted with local 256-bit AES-CBC keys.
-  * Every transmission signed with `HMAC-SHA256` (`X-WSC-Sig`).
+* **100% Cookieless & Privacy-First**: GDPR, TDDDG, and ePrivacy compliant by design — rotating daily salted session hashes (`SHA256(IP + UA + DailySalt)`) with zero tracking cookies and zero stored raw IPs.
+* **Dual-Layer Sensor Architecture**:
+  * **Edge HTTP Kernel Sensor (`WscRequestSubscriber`)**: Intercepts AI Retrieval/RAG agents (`ChatGPT-User`, `OAI-SearchBot`, `PerplexityBot`), AI Training scrapers (`GPTBot`, `ClaudeBot`, `CCBot`, `Bytespider`), and Search crawlers (`Googlebot`, `Bingbot`) before response rendering.
+  * **Client Runtime (`wsc-tracker.js`)**: Zero-dependency Vanilla ES6 (< 5 KB) with 5s/10-event micro-batching and `navigator.sendBeacon` unload flush.
+* **Non-Blocking SQLite WAL Storage**:
+  * Buffers outgoing events in `queue_temp.sqlite` and caches pre-computed reports in `reports_temp.sqlite` (`PRAGMA journal_mode = WAL`) without locking Drupal's primary MySQL/PostgreSQL database.
+* **Canonical 7-Card Bento Suite & Multi-Period Switcher (`1d`, `7d`, `30d`, `90d`, `365d`)**:
+  1. **`card1_traffic`** — Real Human Visitors, Pageviews, Engaged Time & AI/Search/Social/Direct Attribution
+  2. **`card2_insights`** — Algorithmic Growth Insights, Anomaly Detection & Prioritized Actions
+  3. **`card3_bots`** — AI Bot Shield Sensor Network (Live RAG vs. Training Scrapers vs. Search Indexers)
+  4. **`card_engagement`** — Engaged Reading Time, TTFI, Scroll Milestones (25/50/75/100%) & UX Verdict Badges
+  5. **`card_outbound`** — External Link Destinations Categorized (Jobs, Social, Affiliate, Reference)
+  6. **`card_ecommerce`** — 4-Stage Conversion Funnel (`Views` → `Cart` → `Checkout` → `Purchase`) & Revenue
+  7. **`domain_health` + `pagespeed`** — Port-25-Free Domain Sentinel (DNSSEC, SSL, SPF/DMARC, Security Headers) & **SpeedSentinel 2.0 Dual-Thermometer** (🤖 RAG Readiness vs. 👤 Human CWV)
+* **On-Demand Cloud Diagnostics & Live Progress Banner**:
+  * 1-click triggers for `/wsc/v1/pagespeed/audit` and `/wsc/v1/sentinel/scan` with non-blocking `/wsc/v1/cards` polling.
+* **Native Drupal Views & Charts Integration (`hook_views_data`)**:
+  * Exposes `wsc_daily_overview`, `wsc_bot_stats`, and `wsc_top_pages` directly to **Drupal Views** and **`drupal/charts`** (Apache ECharts, Chart.js, Highcharts).
+* **Cryptographic Sovereignty**:
+  * Optional cloud sync (`https://api.worldsearchcouncil.org`) uses local **AES-256-CBC** payload encryption and **HMAC-SHA256 (`X-WSC-Sig`)** signature verification.
 
 ---
 
@@ -33,68 +44,63 @@ Provides cookieless, privacy-first web analytics, deep AI crawler tracking at th
 
 ```text
 wsc-core-drupal/
-├── wsc_analytics.info.yml           # Drupal module metadata (^10 || ^11)
-├── wsc_analytics.module             # Page attachments, cron, theme definitions
-├── wsc_analytics.routing.yml        # Routes: /wsc/v1/track, /wsc/v1/webhook, /admin/reports/wsc-analytics
-├── wsc_analytics.permissions.yml    # Permissions ('administer wsc analytics', 'access wsc analytics reports')
-├── wsc_analytics.libraries.yml      # Asset definitions (tracker, dashboard)
-├── wsc_analytics.services.yml       # Symfony Dependency Injection definitions
-├── wsc_analytics.links.menu.yml     # Admin menu links
-├── wsc_analytics.links.task.yml     # Admin tabs
-├── wsc_analytics.views.inc          # hook_views_data() for Drupal Views & Charts
+├── wsc_analytics.info.yml            # Drupal module metadata (v2.2.0)
+├── wsc_analytics.module              # Page attachments, cron & theme hooks
+├── wsc_analytics.routing.yml         # /wsc/v1/track, /webhook, /cards, /pagespeed/audit, /sentinel/scan
+├── wsc_analytics.permissions.yml     # Granular Drupal ACL permissions
+├── wsc_analytics.libraries.yml       # Tracker & Bento dashboard asset libraries
+├── wsc_analytics.services.yml        # Symfony DI container services
+├── wsc_analytics.links.menu.yml      # Reports & Configuration menu links
+├── wsc_analytics.links.task.yml      # Admin local task tabs
+├── wsc_analytics.views.inc           # hook_views_data() for Drupal Views & Charts
 ├── src/
 │   ├── Service/
-│   │   ├── WscCoreService.php       # AES-256 encryption, HMAC signing, Gateway sync
-│   │   ├── WscDatabaseManager.php   # SQLite management with WAL & security protection
-│   │   └── WscBotTracker.php        # AI/LLM crawler taxonomy & pattern engine
+│   │   ├── WscCoreService.php        # 7-Card Bento storage, AES-256, HMAC & Gateway triggers
+│   │   ├── WscDatabaseManager.php    # Hardened SQLite WAL manager
+│   │   └── WscBotTracker.php         # Canonical AI/RAG/Search crawler taxonomy
 │   ├── EventSubscriber/
-│   │   └── WscRequestSubscriber.php # Kernel request subscriber for edge bot tracking
+│   │   └── WscRequestSubscriber.php  # Early KernelEvents::REQUEST bot sensor
 │   ├── Controller/
-│   │   ├── WscApiController.php     # Ingestion & webhook REST controller
-│   │   └── WscDashboardController.php # 3-Card Dashboard controller
+│   │   ├── WscApiController.php      # Intake, signed webhook receiver & async diagnostic routes
+│   │   └── WscDashboardController.php# 7-Card Bento Dashboard controller
 │   └── Form/
-│       └── WscSettingsForm.php      # Admin configuration form
+│       └── WscSettingsForm.php       # Configuration & Gateway pairing form
 ├── templates/
-│   └── wsc-dashboard.html.twig      # Twig template for 3-Card Dashboard
+│   └── wsc-dashboard.html.twig       # 7-Card Bento Dashboard Twig template (Claro / Gin compatible)
 ├── js/
-│   ├── wsc-tracker.js               # Canonical Vanilla WSC client tracker
-│   └── wsc-dashboard.js             # Interactive dashboard JS (toggles & sync)
+│   ├── wsc-tracker.js                # Canonical Vanilla ES6 tracker
+│   └── wsc-dashboard.js              # Period switcher, diagnostic triggers & live polling banner
 └── css/
-    └── wsc-dashboard.css            # Dashboard styling (Claro / Gin compatible)
+    └── wsc-dashboard.css             # Responsive Bento Grid styles
 ```
 
 ---
 
 ## 🚀 Installation & Setup
 
-1. Copy the `wsc-core-drupal` directory into your Drupal project under `web/modules/custom/wsc_analytics` (or `modules/wsc_analytics`).
-2. Enable the module via Drush or the Drupal Admin UI:
+1. Copy this directory into `web/modules/custom/wsc_analytics` (or `modules/custom/wsc_analytics`).
+2. Enable via Drush or the Extend UI:
    ```bash
    drush pm:enable wsc_analytics
    ```
-3. Navigate to **Administration → Configuration → Web services → WSC Analytics** (`/admin/config/services/wsc-analytics`) to verify settings.
-4. View real-time analytics under **Administration → Reports → WSC Analytics & Bot Shield** (`/admin/reports/wsc-analytics`).
+3. Configure optional WSC Gateway pairing and WSC Membership credentials at **Administration → Configuration → Web services → WSC Analytics** (`/admin/config/services/wsc-analytics`).
+4. Open the 7-Card Bento Dashboard at **Administration → Reports → WSC Analytics & Bot Shield** (`/admin/reports/wsc-analytics`).
 
 ---
 
-## 📊 Using with the Drupal Charts Module (`drupal/charts`)
+## 📊 Using with Drupal Views & `drupal/charts`
 
-1. Install `drupal/charts` and your preferred rendering library (e.g., `charts_echarts` or `charts_chartjs`):
-   ```bash
-   composer require drupal/charts
-   drush pm:enable charts charts_echarts
-   ```
-2. Navigate to **Structure → Views → Add view**:
-   * **Show**: *WSC Daily Traffic Overview*
-   * **Format**: *Chart* (Select ECharts or Chart.js)
-   * **X-Axis**: `Date`
-   * **Fields**: `Unique Human Visitors`, `Human Pageviews`, `AI Training Bot Scrapes`, `AI Live RAG Hits`
-3. Save the View to display custom interactive charts in any Drupal Block or Page!
+```bash
+composer require drupal/charts
+drush pm:enable charts charts_echarts
+```
+
+Create a View under **Structure → Views → Add view**, select **Show: WSC Daily Traffic Overview**, choose **Format: Chart (ECharts)**, and plot `Unique Human Visitors`, `Human Pageviews`, `AI Live RAG Hits`, and `AI Training Bot Scrapes` by `Date`.
 
 ---
 
-## 🔒 Security & Privacy
+## 🔗 Resources & License
 
-* **SQLite Hardening**: The SQLite databases are stored in `private://wsc_analytics` or `public://wsc_analytics` protected with `.htaccess`, `web.config`, and `index.php` blocking all direct web access.
-* **Ad-Blocker Proof**: Endpoints run natively on the first-party domain `/wsc/v1/track`.
-* **Zero Fingerprinting**: Respects user privacy, eliminates third-party tracking scripts.
+- **Official Portal & Member Console:** [https://www.worldsearchcouncil.org](https://www.worldsearchcouncil.org)
+- **Drupal Integration Docs:** [https://world-search-council.github.io/wsc-docs/platforms/drupal/](https://world-search-council.github.io/wsc-docs/platforms/drupal/)
+- **License:** [GNU General Public License v2.0 or later (GPL-2.0-or-later)](LICENSE)
