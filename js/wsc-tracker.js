@@ -14,9 +14,20 @@
     // Global WSC namespace
     window.WSC = window.WSC || {};
 
-    // Read Drupal drupalSettings or window.WSC_CONFIG
-    const drupalCfg = (window.drupalSettings && window.drupalSettings.wscConfig) ? window.drupalSettings.wscConfig : {};
-    const cfg = Object.assign({}, window.WSC_CONFIG || {}, drupalCfg);
+    // Read Drupal drupalSettings (with JSON script fallback) or window.WSC_CONFIG
+    let drupalCfg = (window.drupalSettings && window.drupalSettings.wscConfig) ? window.drupalSettings.wscConfig : null;
+    if (!drupalCfg) {
+        try {
+            const el = document.querySelector('script[data-drupal-selector="drupal-settings-json"]');
+            if (el && el.textContent) {
+                const parsed = JSON.parse(el.textContent);
+                if (parsed && parsed.wscConfig) {
+                    drupalCfg = parsed.wscConfig;
+                }
+            }
+        } catch (e) {}
+    }
+    const cfg = Object.assign({}, window.WSC_CONFIG || {}, drupalCfg || {});
 
     const ENDPOINT = cfg.endpoint || '/wsc/v1/track';
     const MODE = (cfg.mode === 'consent') ? 'consent' : 'cookieless';

@@ -21,7 +21,7 @@
   * Rotating daily salted session hashes (`SHA256(IP + UA + DailySalt)`) — zero tracking cookies and **zero stored raw IP addresses**.
   * **Zero Unconsented Phone-Home**: Hybrid Cloud Sync (`hybrid_enabled: false`) and `IndexNow` (`indexnow_enabled: false`) default strictly to opt-in.
 * **Dual-Layer Sensor Architecture**:
-  * **Edge HTTP Kernel Sensor (`WscRequestSubscriber`)**: Intercepts AI Retrieval/RAG agents (`ChatGPT-User`, `OAI-SearchBot`, `PerplexityBot`), AI Training scrapers (`GPTBot`, `ClaudeBot`, `CCBot`, `Bytespider`), and Search crawlers (`Googlebot`, `Bingbot`).
+  * **Pre-PageCache StackMiddleware & Kernel Sensor (`WscBotShieldMiddleware` + `WscRequestSubscriber`)**: Captures AI Retrieval/RAG agents (`ChatGPT-User`, `OAI-SearchBot`, `PerplexityBot`), AI Training scrapers (`GPTBot`, `ClaudeBot`, `CCBot`, `Bytespider`), and Search crawlers (`Googlebot`, `Bingbot`) even on warm Drupal `PageCache` responses with zero session or raw-IP storage.
   * **Client Runtime (`wsc-tracker.js`)**: Zero-dependency Vanilla ES6 (< 5 KB) bundled locally with zero external CDNs.
 * **Canonical 7-Card Bento Suite & Multi-Period Switcher (`1d`, `7d`, `30d`, `90d`, `365d`)**:
   1. **`card1_traffic`** — Real Human Visitors, Pageviews, Engaged Time & AI/Search/Social/Direct Attribution

@@ -16,3 +16,14 @@ services:
     arguments: ['@wsc_analytics.core', '@wsc_analytics.bot_tracker', '@config.factory']
     tags:
       - { name: event_subscriber }
+
+  http_middleware.wsc_bot_shield:
+    class: Drupal\wsc_analytics\StackMiddleware\WscBotShieldMiddleware
+    arguments: ['@service_container']
+    tags:
+      - { name: http_middleware, priority: 250, responder: false }
+
+  wsc_analytics.route_subscriber:
+    class: Drupal\wsc_analytics\Routing\WscRouteSubscriber
+    tags:
+      - { name: event_subscriber }

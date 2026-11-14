@@ -70,7 +70,7 @@ function _wsc_analytics_handle_entity_save(EntityInterface $entity): void {
       $config = \Drupal::config('wsc_analytics.settings');
       if ($config->get('indexnow_enabled')) {
         $url = $entity->toUrl('canonical', ['absolute' => true])->toString();
-        $home = rtrim(\Drupal::request()->getSchemeAndHttpHost(), '/') . '/';
+        $home = $core->resolveBaseUrl() . '/';
         $core->submitIndexNow([$url, $home], 'auto');
       }
     }
@@ -99,6 +99,7 @@ function wsc_analytics_cron() {
   /** @var \Drupal\wsc_analytics\Service\WscCoreService $core */
   $core = \Drupal::service('wsc_analytics.core');
   $core->processBatchExport();
+  $core->pullRemoteReports();
 
   $last_cleanup = \Drupal::state()->get('wsc_analytics.last_cleanup', 0);
   if ((time() - $last_cleanup) > 86400) {
@@ -129,6 +130,7 @@ function wsc_analytics_theme() {
         'llms_txt_enabled'  => true,
         'indexnow_enabled'  => false,
         'indexnow_key'      => '',
+        'indexnow_key_url'  => '',
         'project_id'        => '',
         'last_sync'         => '',
         'has_data'          => false,

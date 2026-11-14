@@ -62,7 +62,10 @@ class WscRequestSubscriber implements EventSubscriberInterface {
       }
     }
 
-    // 2. Zero-PII Bot Shield sensor
+    // 2. Zero-PII Bot Shield sensor (skip if already handled by WscBotShieldMiddleware)
+    if ($request->attributes->get('_wsc_bot_tracked')) {
+      return;
+    }
     $config = $this->configFactory->get('wsc_analytics.settings');
     if (!$config->get('tracking_active')) {
       return;
@@ -97,9 +100,11 @@ class WscRequestSubscriber implements EventSubscriberInterface {
    * Record bot_hit with HTTP status code when response is ready (Zero-PII).
    */
   public function onKernelResponse(ResponseEvent $event): void {
-    if (!$event->isMainRequest() || !$this->detectedBot) {
+    if (!$event->isMainRequest() || !$this->detectedBot || $event->getRequest()->attributes->get('_wsc_bot_tracked')) {
+      $this->detectedBot = null;
       return;
     }
+    $event->getRequest()->attributes->set('_wsc_bot_tracked', true);
 
     $status_code = $event->getResponse()->getStatusCode();
 

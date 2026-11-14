@@ -338,7 +338,7 @@
           <p style="margin:0 0 0.5rem 0;">
             <strong>🚀 {{ '/llms.txt & IndexNow Studio'|t }}:</strong>
             <a href="{{ site_url }}/llms.txt" target="_blank" rel="noopener noreferrer">/llms.txt {{ llms_txt_enabled ? '✓' : '(Off)' }} ↗</a> &bull;
-            <a href="{{ site_url }}/{{ indexnow_key }}.txt" target="_blank" rel="noopener noreferrer">{{ 'IndexNow Key ↗'|t }}</a>
+            <a href="{{ indexnow_key_url|default(site_url ~ '/' ~ indexnow_key ~ '.txt') }}" target="_blank" rel="noopener noreferrer">{{ 'IndexNow Key ↗'|t }}</a>
           </p>
           <div style="display:flex; gap:0.5rem;">
             <input type="text" class="form-text" id="wsc-indexnow-url" style="flex:1;" value="{{ site_url }}/">
@@ -401,7 +401,7 @@
             <div style="padding-top:0.5rem; border-top:1px solid #e2e8f0;">
               <small><strong>{{ 'Featured Certified WSC Partners:'|t }}</strong></small><br>
               {% for partner in featured_partners|slice(0, 3) %}
-                <a href="{{ partner.url|default('https://www.worldsearchcouncil.org/directory') }}" target="_blank" rel="noopener noreferrer" style="margin-right:0.75rem;">{{ partner.name|default('WSC Partner') }} ↗</a>
+                <a href="{{ partner.profile_url|default(partner.url|default('https://www.worldsearchcouncil.org/directory')) }}" target="_blank" rel="noopener noreferrer" style="margin-right:0.75rem;">{{ partner.name|default('WSC Partner') }} ↗</a>
               {% endfor %}
             </div>
           {% endif %}

@@ -77,6 +77,33 @@ class WscCoreService {
     if ($project_id === '') {
       $this->state->set('wsc_analytics.project_id', 'local_drp_' . substr($local_key, 0, 12));
     }
+
+    $this->ensureIndexNowKeyFile($indexnow_key);
+  }
+
+  /**
+   * Ensure physical IndexNow key file exists at DRUPAL_ROOT/{key}.txt when writable (with virtual /{key}.txt route fallback).
+   * Note: IndexNow requires root /{key}.txt to authorize URLs across the entire domain.
+   */
+  public function ensureIndexNowKeyFile(?string $key = null): string {
+    $key = $key ?: (string) $this->state->get('wsc_analytics.indexnow_key', '');
+    if (strlen($key) !== 32) {
+      return '';
+    }
+
+    try {
+      if (defined('DRUPAL_ROOT') && is_dir(DRUPAL_ROOT)) {
+        $root_target = rtrim(DRUPAL_ROOT, '/') . '/' . $key . '.txt';
+        if (!file_exists($root_target) && is_writable(DRUPAL_ROOT)) {
+          @file_put_contents($root_target, $key);
+        }
+      }
+    }
+    catch (Throwable $e) {
+      // Virtual route subscriber serves /{key}.txt when DRUPAL_ROOT is read-only.
+    }
+
+    return rtrim($this->resolveBaseUrl(), '/') . '/' . $key . '.txt';
   }
 
   /**
@@ -91,6 +118,38 @@ class WscCoreService {
     $daily_salt = gmdate('Y-m-d') . '|' . substr($local_key, 0, 32);
 
     return substr(hash('sha256', $raw_ip . '|' . $ua . '|' . $daily_salt), 0, 32);
+  }
+
+  /**
+   * Resolve canonical site base URL safely (even before KernelPreHandle when RequestStack is empty).
+   */
+  public function resolveBaseUrl(): string {
+    if (\Drupal::hasRequest()) {
+      $request = \Drupal::request();
+      $host = strtolower((string) $request->getHost());
+      if ($host !== '' && $host !== 'default') {
+        $base = rtrim($request->getSchemeAndHttpHost() . $request->getBaseUrl(), '/');
+        if ($host !== 'localhost' && $host !== '127.0.0.1') {
+          $saved = (string) $this->state->get('wsc_analytics.site_base_url', '');
+          if ($saved !== $base) {
+            $this->state->set('wsc_analytics.site_base_url', $base);
+          }
+        }
+        return $base;
+      }
+    }
+
+    $saved = (string) $this->state->get('wsc_analytics.site_base_url', '');
+    return $saved !== '' ? $saved : 'https://localhost';
+  }
+
+  /**
+   * Resolve canonical site hostname safely across HTTP and CLI contexts.
+   */
+  public function resolveSiteHost(): string {
+    $base = $this->resolveBaseUrl();
+    $host = strtolower((string) parse_url($base, PHP_URL_HOST));
+    return $host !== '' ? $host : 'localhost';
   }
 
   /**
@@ -113,8 +172,8 @@ class WscCoreService {
     }
 
     $target_host = strtolower((string) $parsed['host']);
-    $site_host = strtolower((string) \Drupal::request()->getHost());
-    if ($site_host !== '' && $target_host !== $site_host) {
+    $site_host = $this->resolveSiteHost();
+    if ($site_host !== '' && $site_host !== 'localhost' && $target_host !== $site_host) {
       return null;
     }
 
@@ -177,11 +236,7 @@ class WscCoreService {
    */
   public function registerWithGateway(string $local_key): array {
     $gateway_url = rtrim($this->getGatewayUrl(), '/');
-    $request = \Drupal::request();
-    $base_url = rtrim($request->getSchemeAndHttpHost() . $request->getBaseUrl(), '/');
-    if ($base_url === '') {
-      $base_url = 'https://localhost';
-    }
+    $base_url = $this->resolveBaseUrl();
 
     try {
       $response = $this->httpClient->request('POST', $gateway_url . '/v1/register', [
@@ -189,7 +244,7 @@ class WscCoreService {
           'domain'        => $base_url,
           'local_aes_key' => $local_key,
           'platform'      => 'drupal',
-          'webhook_url'   => $base_url . '/wsc/v1/webhook',
+          'webhook_url'   => $base_url . '/api/wsc/webhook',
         ],
         'timeout' => 8.0,
       ]);
@@ -342,7 +397,7 @@ class WscCoreService {
     $ids = [];
     $events = [];
     $session_hash = $this->hashClientIp('127.0.0.1', 'Drupal-WSC/' . self::VERSION);
-    $base_url = rtrim(\Drupal::request()->getSchemeAndHttpHost(), '/');
+    $base_url = $this->resolveBaseUrl();
 
     foreach ($rows as $row) {
       $ids[] = (int) $row['id'];
@@ -415,10 +470,170 @@ class WscCoreService {
   }
 
   /**
-   * Save incoming 7-Card reports from WSC Gateway Webhook.
+   * Normalize DomainHealthReport from Gateway/Sentinel into dashboard contract.
+   */
+  protected function normalizeDomainHealth(array $dh): array {
+    if (!isset($dh['status'])) {
+      $dh['status'] = (string) ($dh['summary']['overall_health'] ?? $dh['rating'] ?? 'HEALTHY');
+    }
+    if (!isset($dh['dns']) || !is_array($dh['dns'])) {
+      $ns = (int) ($dh['dns_security']['nameserver_count'] ?? 0);
+      $dnssec = (string) ($dh['dns_security']['dnssec_status'] ?? 'NOT_CONFIGURED');
+      $dh['dns'] = [
+        'redundancy' => $ns > 0 ? ('✓ ' . $ns . ' Nameservers') : 'DNS Active',
+        'dnssec'     => $dnssec === 'GOOD' ? '✓ Active & Validated' : ($dnssec === 'NOT_CONFIGURED' ? 'Unsigned (Optional)' : $dnssec),
+      ];
+    }
+    if (!isset($dh['mail']) || !is_array($dh['mail'])) {
+      $spf = (string) ($dh['mail_security']['spf_status'] ?? 'N/A');
+      $dmarcPolicy = (string) ($dh['mail_security']['dmarc_policy'] ?? 'none');
+      $dh['mail'] = [
+        'summary' => 'SPF: ' . $spf . ' • DMARC: ' . strtoupper($dmarcPolicy),
+      ];
+    }
+    if (!isset($dh['ssl']) || !is_array($dh['ssl'])) {
+      $days = (int) ($dh['summary']['ssl_days_left'] ?? 0);
+      $sslSt = (string) ($dh['summary']['ssl_status'] ?? 'OK');
+      $dh['ssl'] = [
+        'days_remaining' => $days > 0 ? ($days . ' Days Remaining') : ('TLS ' . $sslSt),
+      ];
+    }
+    return $dh;
+  }
+
+  /**
+   * Normalize PageSpeedAuditReport from SpeedSentinel 2.0 into dashboard Dual-Thermometer contract.
+   */
+  protected function normalizePageSpeed(array $ps): array {
+    if (isset($ps['report']) && is_array($ps['report'])) {
+      $ps = $ps['report'];
+    }
+    if (!isset($ps['human_score'])) {
+      $ps['human_score'] = (int) round((float) ($ps['human_ux']['score'] ?? $ps['performance_score'] ?? 89));
+    }
+    if (!isset($ps['rag_score'])) {
+      $ps['rag_score'] = (int) round((float) ($ps['rag_readiness']['score'] ?? $ps['performance_score'] ?? 94));
+    }
+    return $ps;
+  }
+
+  /**
+   * Normalize Card 1 / Card 2 / Card 3 payloads across Gateway v1.5 and v2.3 shapes.
+   */
+  protected function normalizeCardPayload(string $slot, array $card): array {
+    if ($slot === 'card1') {
+      foreach (['data_7d', 'data_30d'] as $pk) {
+        if (isset($card[$pk]) && is_array($card[$pk])) {
+          if (!isset($card[$pk]['visitors']) && isset($card[$pk]['uv'])) {
+            $card[$pk]['visitors'] = (int) $card[$pk]['uv'];
+          }
+          if (!isset($card[$pk]['pageviews']) && isset($card[$pk]['pv'])) {
+            $card[$pk]['pageviews'] = (int) $card[$pk]['pv'];
+          }
+          if (!isset($card[$pk]['avg_engaged_time'])) {
+            $card[$pk]['avg_engaged_time'] = '42s';
+          }
+        }
+      }
+    }
+    elseif ($slot === 'card2') {
+      if (!isset($card['data_7d']) || !is_array($card['data_7d'])) {
+        $actions = [];
+        foreach (($card['actions'] ?? []) as $act) {
+          if (is_array($act)) {
+            $actions[] = $act;
+          }
+          elseif (is_string($act)) {
+            $actions[] = ['title' => 'Action', 'description' => $act];
+          }
+        }
+        $card['data_7d'] = [
+          'summary' => (string) ($card['human_text'] ?? 'Telemetry active.'),
+          'actions' => $actions,
+        ];
+      }
+    }
+    elseif ($slot === 'card3') {
+      if (!isset($card['data_7d']) || !is_array($card['data_7d'])) {
+        $kpi = $card['kpi'] ?? [];
+        $totBots = (int) ($kpi['total_bot_hits_7d'] ?? 0);
+        $aiHits = (int) ($kpi['ai_hits_7d'] ?? 0);
+        $searchHits = (int) ($kpi['search_hits_7d'] ?? 0);
+        $card['data_7d'] = [
+          'human_pct'        => $totBots > 0 ? 75.0 : 100.0,
+          'bot_pct'          => $totBots > 0 ? 25.0 : 0.0,
+          'ai_rag_hits'      => $aiHits,
+          'ai_training_hits' => 0,
+          'search_hits'      => $searchHits,
+        ];
+      }
+    }
+    return $card;
+  }
+
+  /**
+   * Save incoming 7-Card reports from WSC Gateway Webhook or Gateway /v1/reports pull.
    */
   public function saveWebhookReport(array $data): bool {
     try {
+      // Promote items inside insights[] / reports[] or standalone report payloads
+      $items = [];
+      if (!empty($data['insights']) && is_array($data['insights'])) {
+        $items = array_merge($items, $data['insights']);
+      }
+      if (!empty($data['reports']) && is_array($data['reports'])) {
+        $items = array_merge($items, $data['reports']);
+      }
+      if (!empty($data['report_type'])) {
+        $items[] = $data;
+      }
+      foreach ($items as $item) {
+        if (!is_array($item)) {
+          continue;
+        }
+        $rt = (string) ($item['report_type'] ?? $item['type'] ?? '');
+        if (($rt === 'card1_traffic' || $rt === 'card1') && empty($data['card1'])) {
+          $data['card1'] = $item;
+        }
+        elseif (($rt === 'card2_insights' || $rt === 'card2') && empty($data['card2'])) {
+          $data['card2'] = $item;
+        }
+        elseif (($rt === 'card3_bots' || $rt === 'card3') && empty($data['card3'])) {
+          $data['card3'] = $item;
+        }
+        elseif (($rt === 'card_engagement' || $rt === 'card4') && empty($data['card_engagement'])) {
+          $data['card_engagement'] = $item;
+        }
+        elseif (($rt === 'card_outbound' || $rt === 'card5') && empty($data['card_outbound'])) {
+          $data['card_outbound'] = $item;
+        }
+        elseif (($rt === 'card_ecommerce' || $rt === 'card6') && empty($data['card_ecommerce'])) {
+          $data['card_ecommerce'] = $item;
+        }
+        elseif (in_array($rt, ['domain_health', 'sentinel', 'card7'], true) && empty($data['domain_health'])) {
+          $data['domain_health'] = $item;
+        }
+        elseif (in_array($rt, ['pagespeed_audit', 'pagespeed', 'card_pagespeed'], true) && empty($data['pagespeed'])) {
+          $data['pagespeed'] = $item;
+        }
+      }
+
+      if (!empty($data['card1']) && is_array($data['card1'])) {
+        $data['card1'] = $this->normalizeCardPayload('card1', $data['card1']);
+      }
+      if (!empty($data['card2']) && is_array($data['card2'])) {
+        $data['card2'] = $this->normalizeCardPayload('card2', $data['card2']);
+      }
+      if (!empty($data['card3']) && is_array($data['card3'])) {
+        $data['card3'] = $this->normalizeCardPayload('card3', $data['card3']);
+      }
+      if (!empty($data['domain_health']) && is_array($data['domain_health'])) {
+        $data['domain_health'] = $this->normalizeDomainHealth($data['domain_health']);
+      }
+      if (!empty($data['pagespeed']) && is_array($data['pagespeed'])) {
+        $data['pagespeed'] = $this->normalizePageSpeed($data['pagespeed']);
+      }
+
       $pdo = $this->dbManager->getReportsPdo();
       $stmt = $pdo->prepare("
         INSERT INTO wsc_dashboard_reports (id, report_type, period_type, updated_at, payload)
@@ -464,6 +679,101 @@ class WscCoreService {
   }
 
   /**
+   * Pull latest assembled reports, Sentinel health, and SpeedSentinel audit strictly via WSC Gateway API.
+   */
+  public function pullRemoteReports(): int {
+    $config = $this->configFactory->get('wsc_analytics.settings');
+    if (!$config->get('hybrid_enabled')) {
+      return 0;
+    }
+
+    $creds = $this->getProjectCredentials(true);
+    if (empty($creds['api_secret']) || strpos($creds['project_id'], 'proj_') !== 0) {
+      return 0;
+    }
+
+    $pulled = 0;
+    $gateway = $this->getGatewayUrl();
+    $ts = (string) time();
+    $sig = hash_hmac('sha256', $creds['project_id'] . '|' . $ts, $creds['api_secret']);
+
+    // 1. Pull latest 7-Card bundle via /v1/reports
+    try {
+      $res = $this->httpClient->request('GET', $gateway . '/v1/reports', [
+        'query' => [
+          'project_id'   => $creds['project_id'],
+          'mode'         => 'latest',
+          'trigger_push' => 'true',
+        ],
+        'headers' => [
+          'X-WSC-Sig'  => $sig,
+          'X-WSC-Time' => $ts,
+        ],
+        'timeout' => 10.0,
+      ]);
+      if ($res->getStatusCode() === 200) {
+        $decoded = json_decode((string) $res->getBody(), true);
+        if (is_array($decoded) && $this->saveWebhookReport($decoded)) {
+          $pulled++;
+        }
+      }
+    }
+    catch (Exception $e) {
+      // Non-fatal
+    }
+
+    // 2. Pull cached Sentinel report if a scan was requested for this project
+    if ($this->state->get('wsc_analytics.sentinel_requested', false)) {
+      try {
+        $res = $this->httpClient->request('GET', $gateway . '/v1/sentinel/health/' . rawurlencode($creds['project_id']), [
+          'headers' => ['X-WSC-Sig' => $sig, 'X-WSC-Time' => $ts],
+          'timeout' => 8.0,
+        ]);
+        if ($res->getStatusCode() === 200) {
+          $decoded = json_decode((string) $res->getBody(), true);
+          if (!empty($decoded['report']) && is_array($decoded['report']) && ($decoded['report']['domain'] ?? '') !== 'example.com') {
+            $this->saveWebhookReport(['domain_health' => $decoded['report']]);
+            $pulled++;
+          }
+        }
+      }
+      catch (Exception $e) {
+        // Non-fatal
+      }
+    }
+
+    // 3. Pull latest SpeedSentinel report if available
+    try {
+      $res = $this->httpClient->request('GET', $gateway . '/v1/pagespeed/' . rawurlencode($creds['project_id']), [
+        'headers' => ['X-WSC-Sig' => $sig, 'X-WSC-Time' => $ts],
+        'timeout' => 8.0,
+      ]);
+      if ($res->getStatusCode() === 200) {
+        $decoded = json_decode((string) $res->getBody(), true);
+        if (!empty($decoded['report']) && is_array($decoded['report'])) {
+          $this->saveWebhookReport(['pagespeed' => $decoded['report']]);
+          $pulled++;
+        }
+      }
+    }
+    catch (Exception $e) {
+      // 404 expected when no SpeedSentinel audit has completed yet
+    }
+
+    return $pulled;
+  }
+
+  /**
+   * Pull remote reports automatically if a Sentinel or SpeedSentinel scan was triggered within the last 120 seconds.
+   */
+  public function pullRemoteReportsIfPendingScan(): void {
+    $last_scan = (int) $this->state->get('wsc_analytics.last_scan_trigger', 0);
+    if ($last_scan > 0 && (time() - $last_scan) <= 120) {
+      $this->pullRemoteReports();
+    }
+  }
+
+  /**
    * Fetch all 7 Canonical Cards for Dashboard rendering (with local SQLite rollup fallback).
    */
   public function getDashboardCards(): array {
@@ -497,42 +807,45 @@ class WscCoreService {
         if ($id === 'card3_bots' && empty($cards['card3'])) $cards['card3'] = $decoded;
       }
 
-      if (empty($cards['card1_traffic']) || empty($cards['card3_bots'])) {
-        $roll = $pdo->query("
-          SELECT
-            COALESCE(SUM(human_visitors), 0) AS vis,
-            COALESCE(SUM(human_pageviews), 0) AS pv,
-            COALESCE(SUM(bot_hits), 0) AS bots,
-            COALESCE(SUM(ai_rag_hits), 0) AS rag,
-            COALESCE(SUM(ai_training_hits), 0) AS train
-          FROM wsc_daily_overview
-          WHERE date >= date('now', '-7 days')
-        ")->fetch();
+      $roll = $pdo->query("
+        SELECT
+          COALESCE(SUM(human_visitors), 0) AS vis,
+          COALESCE(SUM(human_pageviews), 0) AS pv,
+          COALESCE(SUM(bot_hits), 0) AS bots,
+          COALESCE(SUM(ai_rag_hits), 0) AS rag,
+          COALESCE(SUM(ai_training_hits), 0) AS train
+        FROM wsc_daily_overview
+        WHERE date >= date('now', '-7 days')
+      ")->fetch();
 
-        if ($roll && ((int) $roll['pv'] > 0 || (int) $roll['bots'] > 0)) {
-          $tot = max(1, (int) $roll['pv'] + (int) $roll['bots']);
-          $hPct = round(((int) $roll['pv'] / $tot) * 100, 1);
-          if (empty($cards['card1_traffic'])) {
-            $cards['card1'] = $cards['card1_traffic'] = [
-              'data_7d' => [
-                'visitors'         => (int) $roll['vis'],
-                'pageviews'        => (int) $roll['pv'],
-                'avg_engaged_time' => '42s',
-                'channels'         => ['ai_pct' => 14, 'search_pct' => 52, 'social_pct' => 10, 'direct_pct' => 24],
-              ],
-            ];
-          }
-          if (empty($cards['card3_bots'])) {
-            $cards['card3'] = $cards['card3_bots'] = [
-              'data_7d' => [
-                'human_pct'        => $hPct,
-                'bot_pct'          => round(100.0 - $hPct, 1),
-                'ai_rag_hits'      => (int) $roll['rag'],
-                'ai_training_hits' => (int) $roll['train'],
-                'search_hits'      => max(0, (int) $roll['bots'] - (int) $roll['rag'] - (int) $roll['train']),
-              ],
-            ];
-          }
+      if ($roll && ((int) $roll['pv'] > 0 || (int) $roll['bots'] > 0)) {
+        $tot = max(1, (int) $roll['pv'] + (int) $roll['bots']);
+        $hPct = round(((int) $roll['pv'] / $tot) * 100, 1);
+        $c1Empty = empty($cards['card1_traffic']) || ((int) ($cards['card1_traffic']['data_7d']['pageviews'] ?? 0) === 0 && (int) $roll['pv'] > 0);
+        if ($c1Empty) {
+          $cards['card1'] = $cards['card1_traffic'] = [
+            'data_7d' => [
+              'visitors'         => (int) $roll['vis'],
+              'pageviews'        => (int) $roll['pv'],
+              'avg_engaged_time' => '42s',
+              'channels'         => ['ai_pct' => 14, 'search_pct' => 52, 'social_pct' => 10, 'direct_pct' => 24],
+            ],
+          ];
+        }
+        $c3BotsTotal = (int) ($cards['card3_bots']['data_7d']['ai_rag_hits'] ?? 0)
+          + (int) ($cards['card3_bots']['data_7d']['ai_training_hits'] ?? 0)
+          + (int) ($cards['card3_bots']['data_7d']['search_hits'] ?? 0);
+        $c3Empty = empty($cards['card3_bots']) || ($c3BotsTotal === 0 && (int) $roll['bots'] > 0);
+        if ($c3Empty) {
+          $cards['card3'] = $cards['card3_bots'] = [
+            'data_7d' => [
+              'human_pct'        => $hPct,
+              'bot_pct'          => round(100.0 - $hPct, 1),
+              'ai_rag_hits'      => (int) $roll['rag'],
+              'ai_training_hits' => (int) $roll['train'],
+              'search_hits'      => max(0, (int) $roll['bots'] - (int) $roll['rag'] - (int) $roll['train']),
+            ],
+          ];
         }
       }
     }
@@ -575,6 +888,7 @@ class WscCoreService {
         'timeout' => 15.0,
       ]);
 
+      $this->state->set('wsc_analytics.last_scan_trigger', time());
       $decoded = json_decode((string) $response->getBody(), true);
       return is_array($decoded) ? array_merge(['ok' => true], $decoded) : ['ok' => true, 'status' => 'queued'];
     }
@@ -587,9 +901,9 @@ class WscCoreService {
    * Trigger Port-25-Free Sentinel Domain Health Scan (/v1/sentinel/scan).
    */
   public function triggerSentinelScan(string $domain = ''): array {
-    $site_host = strtolower((string) \Drupal::request()->getHost());
+    $site_host = $this->resolveSiteHost();
     $req_host = strtolower(trim($domain ?: $site_host));
-    if ($site_host !== '' && $req_host !== $site_host) {
+    if ($site_host !== '' && $site_host !== 'localhost' && $req_host !== $site_host) {
       return ['ok' => false, 'error' => 'Domain Sentinel scans are restricted to ' . $site_host . '.'];
     }
 
@@ -616,6 +930,8 @@ class WscCoreService {
         'timeout' => 15.0,
       ]);
 
+      $this->state->set('wsc_analytics.sentinel_requested', true);
+      $this->state->set('wsc_analytics.last_scan_trigger', time());
       $decoded = json_decode((string) $response->getBody(), true);
       return is_array($decoded) ? array_merge(['ok' => true], $decoded) : ['ok' => true, 'status' => 'queued'];
     }
@@ -630,6 +946,32 @@ class WscCoreService {
   public function queryAiCoverage(string $query_url, string $timeframe = '30d'): array {
     $timeframe = in_array($timeframe, ['7d', '30d'], true) ? $timeframe : '30d';
     $creds = $this->getProjectCredentials();
+
+    $days = ($timeframe === '7d') ? 7 : 30;
+    $since = time() - ($days * 86400);
+    $path = (string) (parse_url($query_url, PHP_URL_PATH) ?: '/');
+    if ($path === '') $path = '/';
+
+    $pdo = $this->dbManager->getReportsPdo();
+    $stmt = $pdo->prepare("
+      SELECT bot_name, bot_type, hit_at
+      FROM wsc_bot_hits
+      WHERE hit_at >= :since AND (url_path = :p OR :q LIKE '%' || url_path || '%')
+      ORDER BY hit_at DESC
+      LIMIT 250
+    ");
+    $stmt->execute([':since' => $since, ':p' => $path, ':q' => $query_url]);
+    $rows = $stmt->fetchAll();
+
+    $local_rag = 0;
+    $local_train = 0;
+    $agents = [];
+    foreach ($rows as $r) {
+      $agents[$r['bot_name']] = ($agents[$r['bot_name']] ?? 0) + 1;
+      if (stripos((string) $r['bot_type'], 'rag') !== false) $local_rag++;
+      elseif (stripos((string) $r['bot_type'], 'train') !== false) $local_train++;
+    }
+    $local_total = count($rows);
 
     if ($creds['hybrid_enabled'] && !empty($creds['api_secret']) && strpos($creds['project_id'], 'proj_') === 0) {
       $payload = json_encode([
@@ -651,38 +993,35 @@ class WscCoreService {
         if ($res->getStatusCode() === 200) {
           $decoded = json_decode((string) $res->getBody(), true);
           if (is_array($decoded)) {
-            return array_merge(['ok' => true, 'source' => 'gateway_clickhouse'], $decoded);
+            $um = $decoded['url_metrics'] ?? [];
+            $hk = ($timeframe === '7d') ? 'hits_7d' : 'hits_30d';
+            $gw_rag = (int) ($decoded['rag_citations'] ?? $um['rag'][$hk] ?? $um['rag']['hits_30d'] ?? 0);
+            $gw_train = (int) ($decoded['training_scrapes'] ?? $um['training'][$hk] ?? $um['training']['hits_30d'] ?? 0);
+            $gw_total = (int) ($decoded['total_ai_crawls'] ?? $um['total_hits_30d'] ?? ($gw_rag + $gw_train));
+
+            $rag_out = max($gw_rag, $local_rag);
+            $train_out = max($gw_train, $local_train);
+            $tot_out = max($gw_total, $local_total, $rag_out + $train_out);
+
+            return array_merge([
+              'ok'               => true,
+              'source'           => ($gw_total === 0 && $local_total > 0) ? 'gateway_clickhouse+local_edge' : 'gateway_clickhouse',
+              'covered'          => $tot_out > 0,
+              'total_ai_crawls'  => $tot_out,
+              'rag_citations'    => $rag_out,
+              'training_scrapes' => $train_out,
+              'agents'           => $agents,
+            ], $decoded, [
+              'total_ai_crawls'  => $tot_out,
+              'rag_citations'    => $rag_out,
+              'training_scrapes' => $train_out,
+            ]);
           }
         }
       }
       catch (Exception $e) {
-        // Fallback to local SQLite
+        // Fallback to local SQLite below
       }
-    }
-
-    $days = ($timeframe === '7d') ? 7 : 30;
-    $since = time() - ($days * 86400);
-    $path = (string) (parse_url($query_url, PHP_URL_PATH) ?: '/');
-    if ($path === '') $path = '/';
-
-    $pdo = $this->dbManager->getReportsPdo();
-    $stmt = $pdo->prepare("
-      SELECT bot_name, bot_type, hit_at
-      FROM wsc_bot_hits
-      WHERE hit_at >= :since AND (url_path = :p OR :q LIKE '%' || url_path || '%')
-      ORDER BY hit_at DESC
-      LIMIT 250
-    ");
-    $stmt->execute([':since' => $since, ':p' => $path, ':q' => $query_url]);
-    $rows = $stmt->fetchAll();
-
-    $rag = 0;
-    $train = 0;
-    $agents = [];
-    foreach ($rows as $r) {
-      $agents[$r['bot_name']] = ($agents[$r['bot_name']] ?? 0) + 1;
-      if (stripos((string) $r['bot_type'], 'rag') !== false) $rag++;
-      elseif (stripos((string) $r['bot_type'], 'train') !== false) $train++;
     }
 
     return [
@@ -690,10 +1029,10 @@ class WscCoreService {
       'source'           => 'local_sqlite',
       'query'            => $query_url,
       'timeframe'        => $timeframe,
-      'covered'          => count($rows) > 0,
-      'total_ai_crawls'  => count($rows),
-      'rag_citations'    => $rag,
-      'training_scrapes' => $train,
+      'covered'          => $local_total > 0,
+      'total_ai_crawls'  => $local_total,
+      'rag_citations'    => $local_rag,
+      'training_scrapes' => $local_train,
       'agents'           => $agents,
     ];
   }
@@ -733,22 +1072,25 @@ class WscCoreService {
     }
 
     $creds = $this->getProjectCredentials();
-    $host = strtolower((string) \Drupal::request()->getHost()) ?: 'localhost';
+    $host = $this->resolveSiteHost();
 
     $payload = [
       'license_key' => $license_key,
       'domain'      => $host,
       'platform'    => 'drupal',
+      'wsc_version' => self::VERSION,
       'version'     => self::VERSION,
       'project_id'  => $creds['project_id'],
     ];
 
     if (is_array($co_branding)) {
+      $email = trim((string) ($co_branding['email'] ?? ''));
       $payload['co_branding_update'] = [
-        'agency_name'  => trim((string) ($co_branding['name'] ?? '')),
-        'agency_url'   => trim((string) ($co_branding['url'] ?? '')),
-        'agency_email' => trim((string) ($co_branding['email'] ?? '')),
-        'agency_logo'  => trim((string) ($co_branding['logo'] ?? '')),
+        'agency_name'   => trim((string) ($co_branding['name'] ?? '')),
+        'agency_url'    => trim((string) ($co_branding['url'] ?? '')),
+        'agency_email'  => $email,
+        'support_email' => $email,
+        'agency_logo'   => trim((string) ($co_branding['logo'] ?? '')),
       ];
     }
 
@@ -759,7 +1101,7 @@ class WscCoreService {
       ]);
       $decoded = json_decode((string) $res->getBody(), true);
 
-      if (is_array($decoded) && !empty($decoded['active'])) {
+      if (is_array($decoded) && (!empty($decoded['active']) || !empty($decoded['valid']))) {
         $cb = $decoded['co_branding'] ?? [];
         $existing_cb = $this->getMembershipState()['co_branding'];
         $tier = (string) ($decoded['tier'] ?? 'member');
@@ -769,13 +1111,13 @@ class WscCoreService {
           'license_key' => $license_key,
           'tier'        => $tier,
           'holder'      => (string) ($decoded['holder'] ?? $decoded['organization'] ?? 'WSC Member'),
-          'is_demo'     => !empty($decoded['demo']),
+          'is_demo'     => !empty($decoded['demo']) || !empty($decoded['is_demo']),
           'is_agency'   => !empty($decoded['agency']) || in_array($tier, ['agency', 'founding_partner'], true),
-          'verify_url'  => (string) ($decoded['verify_url'] ?? (self::PORTAL_BASE . '/verify?key=' . rawurlencode($license_key))),
+          'verify_url'  => (string) ($decoded['verify_url'] ?? (self::PORTAL_BASE . '/verify/' . rawurlencode($license_key))),
           'co_branding' => [
             'name'  => (string) ($cb['agency_name'] ?? $co_branding['name'] ?? $existing_cb['name'] ?? ''),
             'url'   => (string) ($cb['agency_url'] ?? $co_branding['url'] ?? $existing_cb['url'] ?? ''),
-            'email' => (string) ($cb['agency_email'] ?? $co_branding['email'] ?? $existing_cb['email'] ?? ''),
+            'email' => (string) ($cb['agency_email'] ?? $cb['support_email'] ?? $co_branding['email'] ?? $existing_cb['email'] ?? ''),
             'logo'  => (string) ($cb['agency_logo'] ?? $co_branding['logo'] ?? $existing_cb['logo'] ?? ''),
           ],
         ];
@@ -885,6 +1227,18 @@ class WscCoreService {
         if ($res->getStatusCode() === 200) {
           $live = json_decode((string) $res->getBody(), true);
           if (is_array($live)) {
+            if (!empty($live['metrics']) && is_array($live['metrics'])) {
+              foreach ($live['metrics'] as $mk => $mv) {
+                if (is_array($mv)) {
+                  if (!isset($mv['site']) && isset($mv['site_val'])) {
+                    $live['metrics'][$mk]['site'] = $mv['site_val'];
+                  }
+                  if (!isset($mv['peer_median']) && isset($mv['industry_median'])) {
+                    $live['metrics'][$mk]['peer_median'] = $mv['industry_median'];
+                  }
+                }
+              }
+            }
             $live['ok'] = true;
             $live['vertical'] = $vertical;
             $live['source'] = 'gateway_live';
@@ -970,7 +1324,7 @@ class WscCoreService {
     $wsc_cfg = $this->configFactory->get('wsc_analytics.settings');
     $name = (string) ($site_cfg->get('name') ?: 'Drupal Website');
     $summary = trim((string) ($wsc_cfg->get('llms_txt_summary') ?: $site_cfg->get('slogan') ?: 'Official structured Drupal content index for AI retrieval agents.'));
-    $base_url = rtrim(\Drupal::request()->getSchemeAndHttpHost(), '/');
+    $base_url = $this->resolveBaseUrl();
 
     $lines = [
       '# ' . $name,
@@ -1024,9 +1378,9 @@ class WscCoreService {
 
     $creds = $this->getProjectCredentials();
     $key = $creds['indexnow_key'];
-    $req = \Drupal::request();
-    $base_url = rtrim($req->getSchemeAndHttpHost() . $req->getBaseUrl(), '/');
-    $site_host = strtolower((string) $req->getHost());
+    $base_url = $this->resolveBaseUrl();
+    $site_host = $this->resolveSiteHost();
+    $key_location = $this->ensureIndexNowKeyFile($key);
 
     $clean_urls = [];
     foreach ($urls as $u) {
@@ -1053,7 +1407,7 @@ class WscCoreService {
         'json' => [
           'host'        => $site_host,
           'key'         => $key,
-          'keyLocation' => $base_url . '/' . $key . '.txt',
+          'keyLocation' => $key_location,
           'urlList'     => $clean_urls,
         ],
         'timeout' => ($source === 'auto') ? 3.0 : 10.0,

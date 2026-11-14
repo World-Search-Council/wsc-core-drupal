@@ -14,14 +14,6 @@ wsc_analytics.settings:
   requirements:
     _permission: 'administer wsc analytics'
 
-wsc_analytics.llms_txt:
-  path: '/llms.txt'
-  defaults:
-    _controller: '\Drupal\wsc_analytics\Controller\WscApiController::serveLlmsTxt'
-  requirements:
-    _access: 'TRUE'
-  methods: [GET, HEAD]
-
 wsc_analytics.api_track:
   path: '/wsc/v1/track'
   defaults:
@@ -30,8 +22,24 @@ wsc_analytics.api_track:
     _access: 'TRUE'
   methods: [POST]
 
+wsc_analytics.api_track_canonical:
+  path: '/api/wsc/track'
+  defaults:
+    _controller: '\Drupal\wsc_analytics\Controller\WscApiController::track'
+  requirements:
+    _access: 'TRUE'
+  methods: [POST]
+
 wsc_analytics.api_webhook:
   path: '/wsc/v1/webhook'
+  defaults:
+    _controller: '\Drupal\wsc_analytics\Controller\WscApiController::handleWebhook'
+  requirements:
+    _access: 'TRUE'
+  methods: [POST]
+
+wsc_analytics.api_webhook_canonical:
+  path: '/api/wsc/webhook'
   defaults:
     _controller: '\Drupal\wsc_analytics\Controller\WscApiController::handleWebhook'
   requirements:

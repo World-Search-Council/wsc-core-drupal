@@ -46,16 +46,29 @@ class WscDatabaseManager {
   }
 
   /**
-   * Ensure storage directory exists and is secured against direct HTTP downloads.
+   * Ensure storage directory exists outside webroot whenever possible and is secured against direct HTTP downloads.
    */
   public function getStorageDir(): string {
-    $dir = 'private://wsc_analytics';
-    if (!file_exists($dir)) {
-      $dir = 'public://wsc_analytics';
+    $real_dir = '';
+
+    // 1. Prefer Drupal private:// stream wrapper if configured and writable.
+    $private_root = $this->fileSystem->realpath('private://');
+    if ($private_root && is_dir($private_root) && is_writable($private_root)) {
+      $real_dir = rtrim($private_root, '/') . '/wsc_analytics';
     }
-    $real_dir = $this->fileSystem->realpath($dir);
-    if (!$real_dir) {
-      $real_dir = DRUPAL_ROOT . '/sites/default/files/wsc_analytics';
+
+    // 2. Prefer parent directory outside HTTP webroot (standard Composer /var/www/html/web layout).
+    if ($real_dir === '') {
+      $parent_dir = dirname(DRUPAL_ROOT);
+      if ($parent_dir && $parent_dir !== DRUPAL_ROOT && (is_dir($parent_dir . '/wsc_storage') || is_writable($parent_dir))) {
+        $real_dir = rtrim($parent_dir, '/') . '/wsc_storage';
+      }
+    }
+
+    // 3. Fallback to public://wsc_analytics hardened with .htaccess / web.config / Nginx rule.
+    if ($real_dir === '') {
+      $public_root = $this->fileSystem->realpath('public://');
+      $real_dir = ($public_root ? rtrim($public_root, '/') : (DRUPAL_ROOT . '/sites/default/files')) . '/wsc_analytics';
     }
 
     if (!is_dir($real_dir)) {
@@ -244,15 +257,23 @@ class WscDatabaseManager {
   }
 
   /**
-   * Register 'wsc_reports' database target with Drupal Database API so Views can query it.
+   * Register 'wsc_reports' database target with Drupal Database API so Views can query it
+   * across Drupal 8/9 and Drupal 10/11 (where core database drivers live in core/modules/sqlite).
    */
   public function registerDrupalReportsConnection(): void {
     if (!Database::getConnectionInfo('wsc_reports')) {
-      Database::addConnectionInfo('wsc_reports', 'default', [
-        'driver' => 'sqlite',
+      $info = [
+        'driver'   => 'sqlite',
         'database' => $this->getReportsDbPath(),
-        'prefix' => '',
-      ]);
+        'prefix'   => '',
+      ];
+      if (defined('DRUPAL_ROOT') && is_dir(DRUPAL_ROOT . '/core/modules/sqlite/src/Driver/Database/sqlite')) {
+        $info['namespace'] = 'Drupal\\sqlite\\Driver\\Database\\sqlite';
+        $info['autoload']  = 'core/modules/sqlite/src/Driver/Database/sqlite/';
+      }
+      $class_loader = (\Drupal::hasContainer() && \Drupal::hasService('class_loader')) ? \Drupal::service('class_loader') : null;
+      $app_root = defined('DRUPAL_ROOT') ? DRUPAL_ROOT : null;
+      Database::addConnectionInfo('wsc_reports', 'default', $info, $class_loader, $app_root);
     }
   }
 

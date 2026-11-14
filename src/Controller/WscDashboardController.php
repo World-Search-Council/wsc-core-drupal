@@ -74,6 +74,7 @@ class WscDashboardController extends ControllerBase {
       '#llms_txt_enabled'  => (bool) $config->get('llms_txt_enabled'),
       '#indexnow_enabled'  => (bool) $config->get('indexnow_enabled'),
       '#indexnow_key'      => $creds['indexnow_key'],
+      '#indexnow_key_url'  => $this->core->ensureIndexNowKeyFile($creds['indexnow_key']),
       '#project_id'        => $creds['project_id'],
       '#last_sync'         => $last_sync ? gmdate('Y-m-d H:i:s', $last_sync) . ' UTC' : $this->t('Local SQLite Mode'),
       '#has_data'          => $has_data,
@@ -120,9 +121,11 @@ class WscDashboardController extends ControllerBase {
    */
   public function ajaxRefresh(Request $request): JsonResponse {
     $synced = $this->core->processBatchExport();
+    $pulled = $this->core->pullRemoteReports();
     return new JsonResponse([
       'ok'            => true,
       'synced_events' => $synced,
+      'pulled_cards'  => $pulled,
       'last_sync'     => gmdate('Y-m-d H:i:s') . ' UTC',
     ]);
   }

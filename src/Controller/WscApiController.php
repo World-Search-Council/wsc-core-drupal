@@ -127,6 +127,7 @@ class WscApiController extends ControllerBase {
   }
 
   public function getCards(): JsonResponse {
+    $this->core->pullRemoteReportsIfPendingScan();
     return new JsonResponse(['ok' => true, 'cards' => $this->core->getDashboardCards()]);
   }
 

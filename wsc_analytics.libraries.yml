@@ -1,7 +1,7 @@
 tracker:
   version: 2.2.3
   js:
-    js/wsc-tracker.js: { attributes: { defer: true, async: true } }
+    js/wsc-tracker.js: { attributes: { defer: true } }
   dependencies:
     - core/drupalSettings
 
